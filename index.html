@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Holy Bible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FDFDFB;
+    --ink: #1C1B1A;
+    --rubric: #8C2F2F;      /* the red of rubricated manuscripts */
+    --rule: #DAD7D2;
+    --muted: #7A756E;
+    --hover: #F3F1EC;
+    --serif: "EB Garamond", Georgia, "Times New Roman", serif;
+    --sans: "Inter", -apple-system, system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--serif); min-height: 100vh; }
+
+  /* ---------- Top bar ---------- */
+  header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+    padding: 1.1rem 1.5rem 0.9rem; border-bottom: 1px solid var(--rule);
+  }
+  header h1 { font-weight: 500; font-size: 1.25rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  header h1 span { color: var(--rubric); }
+  .trans-wrap {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  select {
+    font-family: var(--sans); font-size: 0.8rem; color: var(--ink);
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 4px;
+    padding: 0.35rem 0.5rem; cursor: pointer; max-width: 15rem;
+  }
+  select:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+
+  .view { display: none; }
+  .view.show { display: block; }
+
+  /* ---------- Page 1: Books ---------- */
+  #booksView { padding: 2rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 62rem; margin: 0 auto; }
+  .testament-label {
+    font-family: var(--sans); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--rubric); margin: 2rem 0 0.8rem;
+    display: flex; align-items: center; gap: 0.9rem;
+  }
+  .testament-label::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  .testament-label:first-child { margin-top: 0; }
+  .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+  .book-grid button {
+    font-family: var(--sans); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em;
+    padding: 0.7rem 0; background: none; border: 1px solid var(--rule); border-radius: 5px;
+    color: var(--ink); cursor: pointer;
+  }
+  .book-grid button:hover { background: var(--hover); }
+  .book-grid button:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+  .book-grid button:disabled { color: var(--rule); border-color: var(--hover); cursor: default; background: none; }
+
+  /* ---------- Page 2: Reading ---------- */
+  #readView { padding: 1.4rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 46rem; margin: 0 auto; }
+  .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+  .back-btn {
+    font-family: var(--sans); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em;
+    background: none; border: 1px solid var(--rule); border-radius: 4px;
+    padding: 0.45rem 0.8rem; color: var(--ink); cursor: pointer; white-space: nowrap;
+  }
+  .back-btn:hover { background: var(--hover); }
+  .back-btn:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+  .read-top .bookname { font-size: 1.3rem; font-weight: 500; letter-spacing: 0.05em; }
+
+  .chapter-strip {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding-bottom: 1.1rem; border-bottom: 1px solid var(--rule); margin-bottom: 1.6rem;
+  }
+  .chapter-strip button {
+    font-family: var(--sans); font-size: 0.74rem; min-width: 36px; padding: 0.45rem 0.3rem;
+    background: none; border: 1px solid var(--rule); border-radius: 4px;
+    color: var(--ink); cursor: pointer;
+  }
+  .chapter-strip button:hover { background: var(--hover); }
+  .chapter-strip button:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+  .chapter-strip button.active { background: var(--rubric); border-color: var(--rubric); color: var(--paper); }
+
+  .welcome { color: var(--muted); font-size: 1.05rem; font-style: italic; margin-top: 1rem; }
+
+  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; }
+  .passage-head .chapnum { font-size: 3.2rem; line-height: 1; color: var(--rubric); }
+  .passage-head .transname {
+    font-family: var(--sans); font-size: 0.68rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+
+  .scripture { font-size: 1.16rem; line-height: 1.75; }
+  .scripture sup,
+  .scripture .v {
+    font-family: var(--sans); font-size: 0.62em; font-weight: 500; color: var(--rubric);
+    margin-right: 0.25em; vertical-align: super; line-height: 0;
+  }
+  .scripture p { margin-bottom: 0.6rem; }
+  /* API.Bible section headings and poetry classes */
+  .scripture h3, .scripture .s, .scripture .s1, .scripture .s2 {
+    font-family: var(--sans); font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+    margin: 1.4rem 0 0.5rem;
+  }
+  .scripture .q, .scripture .q1 { margin-left: 1.2rem; }
+  .scripture .q2 { margin-left: 2.4rem; }
+  .scripture .d { font-style: italic; color: var(--muted); }
+
+  .pager {
+    display: flex; justify-content: space-between; margin-top: 2.2rem;
+    padding-top: 1.1rem; border-top: 1px solid var(--rule);
+  }
+  .pager button {
+    font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.06em;
+    background: none; border: 1px solid var(--rule); border-radius: 4px;
+    padding: 0.5rem 0.9rem; color: var(--ink); cursor: pointer;
+  }
+  .pager button:hover { background: var(--hover); }
+  .pager button:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+  .pager button[hidden] { visibility: hidden; }
+
+  .status { color: var(--muted); font-style: italic; margin-top: 1.5rem; }
+  .status.error { color: var(--rubric); font-style: normal; font-family: var(--sans); font-size: 0.85rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .scripture { animation: fadein 0.25s ease; }
+    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Holy <span>Bible</span></h1>
+  <div class="trans-wrap">
+    <label for="translation">Translation</label>
+    <select id="translation"></select>
+  </div>
+</header>
+
+<!-- Page 1: books -->
+<div class="view show" id="booksView">
+  <div class="testament-label">Old Testament</div>
+  <div class="book-grid" id="otGrid"></div>
+  <div class="testament-label">New Testament</div>
+  <div class="book-grid" id="ntGrid"></div>
+</div>
+
+<!-- Page 2: chapters + reading -->
+<div class="view" id="readView">
+  <div class="read-top">
+    <button class="back-btn" id="backBtn">&larr; Books</button>
+    <div class="bookname" id="bookName"></div>
+  </div>
+  <div class="chapter-strip" id="chapterStrip"></div>
+  <div id="reader"></div>
+</div>
+
+<script>
+/* =========================================================
+   SOURCES
+   Source A — bible-api.com   (public domain, no key)
+   Source B — API.Bible       (American Bible Society, keyed)
+   ========================================================= */
+const API_BIBLE = {
+  endpoint: "https://rest.api.bible",
+  key: "vKdfe3VftRWZ-djccZlMz"
+};
+
+// Leave empty to list every English Bible your key can access.
+// To trim the dropdown, put chosen Bible IDs here, e.g.:
+//   const FEATURED_API_BIBLES = ["de4e12af7f28f599-02", "01b29f4b342acc35-01"];
+const FEATURED_API_BIBLES = [];
+
+const FREE_TRANSLATIONS = [
+  ["kjv",   "KJV — King James"],
+  ["asv",   "ASV — American Standard"],
+  ["web",   "WEB — World English"],
+  ["webbe", "WEBBE — World English (British)"],
+  ["darby", "Darby"],
+  ["ylt",   "YLT — Young's Literal (NT only)"],
+  ["dra",   "DRA — Douay-Rheims"]
+];
+const NT_ONLY = new Set(["free:ylt"]);
+
+/* ---------- Canon ---------- */
+const OT = [
+  ["GEN","Genesis",50],["EXO","Exodus",40],["LEV","Leviticus",27],["NUM","Numbers",36],
+  ["DEU","Deuteronomy",34],["JOS","Joshua",24],["JDG","Judges",21],["RUT","Ruth",4],
+  ["1SA","1 Samuel",31],["2SA","2 Samuel",24],["1KI","1 Kings",22],["2KI","2 Kings",25],
+  ["1CH","1 Chronicles",29],["2CH","2 Chronicles",36],["EZR","Ezra",10],["NEH","Nehemiah",13],
+  ["EST","Esther",10],["JOB","Job",42],["PSA","Psalms",150],["PRO","Proverbs",31],
+  ["ECC","Ecclesiastes",12],["SNG","Song of Solomon",8],["ISA","Isaiah",66],["JER","Jeremiah",52],
+  ["LAM","Lamentations",5],["EZK","Ezekiel",48],["DAN","Daniel",12],["HOS","Hosea",14],
+  ["JOL","Joel",3],["AMO","Amos",9],["OBA","Obadiah",1],["JON","Jonah",4],
+  ["MIC","Micah",7],["NAM","Nahum",3],["HAB","Habakkuk",3],["ZEP","Zephaniah",3],
+  ["HAG","Haggai",2],["ZEC","Zechariah",14],["MAL","Malachi",4]
+];
+const NT = [
+  ["MAT","Matthew",28],["MRK","Mark",16],["LUK","Luke",24],["JHN","John",21],
+  ["ACT","Acts",28],["ROM","Romans",16],["1CO","1 Corinthians",16],["2CO","2 Corinthians",13],
+  ["GAL","Galatians",6],["EPH","Ephesians",6],["PHP","Philippians",4],["COL","Colossians",4],
+  ["1TH","1 Thessalonians",5],["2TH","2 Thessalonians",3],["1TI","1 Timothy",6],["2TI","2 Timothy",4],
+  ["TIT","Titus",3],["PHM","Philemon",1],["HEB","Hebrews",13],["JAS","James",5],
+  ["1PE","1 Peter",5],["2PE","2 Peter",3],["1JN","1 John",5],["2JN","2 John",1],
+  ["3JN","3 John",1],["JUD","Jude",1],["REV","Revelation",22]
+];
+const ALL = [...OT, ...NT];
+
+const state = { translation: "free:kjv", book: null, chapter: null };
+const $ = id => document.getElementById(id);
+const transSelect = $("translation");
+
+/* ---------- Translation dropdown ---------- */
+function populateFreeTranslations() {
+  const group = document.createElement("optgroup");
+  group.label = "Public domain";
+  for (const [id, label] of FREE_TRANSLATIONS) {
+    const o = document.createElement("option");
+    o.value = "free:" + id;
+    o.textContent = label;
+    group.appendChild(o);
+  }
+  transSelect.appendChild(group);
+  transSelect.value = "free:kjv";
+}
+
+async function populateApiBibles() {
+  try {
+    const res = await fetch(`${API_BIBLE.endpoint}/v1/bibles?language=eng`, {
+      headers: { "api-key": API_BIBLE.key }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { data } = await res.json();
+    let bibles = data || [];
+    if (FEATURED_API_BIBLES.length) {
+      bibles = bibles.filter(b => FEATURED_API_BIBLES.includes(b.id));
+    }
+    bibles.sort((a, b) => (a.abbreviationLocal || a.abbreviation || "").localeCompare(b.abbreviationLocal || b.abbreviation || ""));
+    if (!bibles.length) return;
+    const group = document.createElement("optgroup");
+    group.label = "API.Bible";
+    for (const b of bibles) {
+      const o = document.createElement("option");
+      o.value = "ab:" + b.id;
+      o.textContent = `${b.abbreviationLocal || b.abbreviation} — ${b.name}`;
+      group.appendChild(o);
+    }
+    transSelect.appendChild(group);
+  } catch (err) {
+    console.warn("API.Bible catalog unavailable:", err.message);
+  }
+}
+
+/* ---------- FUMS (required by API.Bible license) ---------- */
+let fumsLoaded = false;
+function reportFums(token) {
+  if (!token) return;
+  const fire = () => { try { window._BAPI && window._BAPI.t(token); } catch (e) {} };
+  if (fumsLoaded) { fire(); return; }
+  const s = document.createElement("script");
+  s.src = "https://cdn.scripture.api.bible/fums/fumsv3.min.js";
+  s.onload = () => { fumsLoaded = true; fire(); };
+  document.head.appendChild(s);
+}
+
+/* ---------- Views & navigation ---------- */
+function showView(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("show", v.id === id));
+  window.scrollTo(0, 0);
+}
+
+function buildGrid(el, books) {
+  el.innerHTML = "";
+  for (const [code, name] of books) {
+    const b = document.createElement("button");
+    b.textContent = code;
+    b.title = name;
+    b.dataset.code = code;
+    b.addEventListener("click", () => openBook(code));
+    el.appendChild(b);
+  }
+}
+buildGrid($("otGrid"), OT);
+buildGrid($("ntGrid"), NT);
+
+function refreshGridState() {
+  const otDisabled = NT_ONLY.has(state.translation);
+  document.querySelectorAll("#otGrid button").forEach(b => b.disabled = otDisabled);
+}
+
+function openBook(code) {
+  state.book = code;
+  state.chapter = null;
+  const [, name, chapters] = ALL.find(b => b[0] === code);
+  $("bookName").textContent = name;
+  const strip = $("chapterStrip");
+  strip.innerHTML = "";
+  for (let c = 1; c <= chapters; c++) {
+    const b = document.createElement("button");
+    b.textContent = c;
+    b.addEventListener("click", () => loadChapter(code, c));
+    strip.appendChild(b);
+  }
+  $("reader").innerHTML = `<p class="welcome">Select a chapter of ${name}.</p>`;
+  showView("readView");
+}
+
+/* ---------- Chapter loading (two sources) ---------- */
+async function loadChapter(code, chapter) {
+  const [, name, chapterCount] = ALL.find(b => b[0] === code);
+  state.book = code;
+  state.chapter = chapter;
+  document.querySelectorAll("#chapterStrip button").forEach(b =>
+    b.classList.toggle("active", Number(b.textContent) === chapter));
+  const reader = $("reader");
+  reader.innerHTML = `<p class="status">Loading ${name} ${chapter}&hellip;</p>`;
+
+  const transName = transSelect.options[transSelect.selectedIndex]?.text || "";
+  const head = `
+    <div class="passage-head">
+      <span class="chapnum">${chapter}</span>
+      <div class="transname">${transName}</div>
+    </div>`;
+  const pager = `
+    <div class="pager">
+      <button id="prevCh" ${chapter <= 1 ? "hidden" : ""}>&larr; ${name} ${chapter - 1}</button>
+      <button id="nextCh" ${chapter >= chapterCount ? "hidden" : ""}>${name} ${chapter + 1} &rarr;</button>
+    </div>`;
+
+  try {
+    let bodyHtml, fumsToken = null;
+    const [source, id] = splitSel(state.translation);
+
+    if (source === "free") {
+      const res = await fetch(`https://bible-api.com/data/${id}/${code}/${chapter}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const verses = data.verses || [];
+      if (!verses.length) throw new Error("No verses returned");
+      bodyHtml = "<p>" + verses.map(v =>
+        `<sup>${v.verse}</sup>${escapeHtml(v.text.trim())}`).join(" ") + "</p>";
+    } else {
+      const url = `${API_BIBLE.endpoint}/v1/bibles/${id}/chapters/${code}.${chapter}` +
+        `?content-type=html&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
+      const res = await fetch(url, { headers: { "api-key": API_BIBLE.key } });
+      if (res.status === 404) throw new Error("This Bible doesn't include this chapter");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      bodyHtml = json.data && json.data.content ? json.data.content : "";
+      if (!bodyHtml) throw new Error("No content returned");
+      fumsToken = (json.meta && (json.meta.fumsToken || json.meta.fumsId)) || null;
+    }
+
+    reader.innerHTML = head + `<div class="scripture">${bodyHtml}</div>` + pager;
+    if (chapter > 1) $("prevCh").addEventListener("click", () => loadChapter(code, chapter - 1));
+    if (chapter < chapterCount) $("nextCh").addEventListener("click", () => loadChapter(code, chapter + 1));
+    reportFums(fumsToken);
+  } catch (err) {
+    reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
+      Check your connection and try again, or switch translations above.</p>`;
+  }
+}
+
+function splitSel(v) {
+  const i = v.indexOf(":");
+  return [v.slice(0, i), v.slice(i + 1)];
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* ---------- Events ---------- */
+$("backBtn").addEventListener("click", () => {
+  state.book = null;
+  state.chapter = null;
+  showView("booksView");
+});
+
+transSelect.addEventListener("change", () => {
+  state.translation = transSelect.value;
+  refreshGridState();
+  if (NT_ONLY.has(state.translation) && state.book && OT.some(b => b[0] === state.book)) {
+    state.book = null; state.chapter = null;
+    showView("booksView");
+    return;
+  }
+  if (state.book && state.chapter) loadChapter(state.book, state.chapter);
+});
+
+/* ---------- Init ---------- */
+populateFreeTranslations();
+populateApiBibles();
+refreshGridState();
+</script>
+</body>
+</html>
