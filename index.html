@@ -387,6 +387,7 @@ $("backBtn").addEventListener("click", () => {
 
 transSelect.addEventListener("change", () => {
   state.translation = transSelect.value;
+  try { localStorage.setItem("bible.defaultTranslation", state.translation); } catch (e) {}
   refreshGridState();
   if (NT_ONLY.has(state.translation) && state.book && OT.some(b => b[0] === state.book)) {
     state.book = null; state.chapter = null;
@@ -397,8 +398,21 @@ transSelect.addEventListener("change", () => {
 });
 
 /* ---------- Init ---------- */
+function restoreSavedTranslation() {
+  let saved = null;
+  try { saved = localStorage.getItem("bible.defaultTranslation"); } catch (e) {}
+  if (!saved) return;
+  const exists = [...transSelect.options].some(o => o.value === saved);
+  if (exists) {
+    transSelect.value = saved;
+    state.translation = saved;
+    refreshGridState();
+  }
+}
+
 populateFreeTranslations();
-populateApiBibles();
+restoreSavedTranslation();                     // free translations restore immediately
+populateApiBibles().then(restoreSavedTranslation); // API.Bible ones restore once the catalog loads
 refreshGridState();
 </script>
 </body>
