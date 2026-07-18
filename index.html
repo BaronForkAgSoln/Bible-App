@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bible">
+<meta name="theme-color" content="#FDFDFB">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
 <title>The Holy Bible</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -65,13 +73,15 @@
 
   /* ---------- Page 2: Reading ---------- */
   #readView { padding: 1.4rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 46rem; margin: 0 auto; }
-  .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+  .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .read-tools { margin-left: auto; display: flex; gap: 4px; }
   .back-btn {
     font-family: var(--sans); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em;
     background: none; border: 1px solid var(--rule); border-radius: 4px;
     padding: 0.45rem 0.8rem; color: var(--ink); cursor: pointer; white-space: nowrap;
   }
   .back-btn:hover { background: var(--hover); }
+  .back-btn:disabled { color: var(--rule); cursor: default; background: none; }
   .back-btn:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
   .read-top .bookname { font-size: 1.3rem; font-weight: 500; letter-spacing: 0.05em; }
 
@@ -97,7 +107,7 @@
     text-transform: uppercase; color: var(--muted);
   }
 
-  .scripture { font-size: 1.16rem; line-height: 1.75; }
+  .scripture { font-size: var(--fs, 1.16rem); line-height: 1.75; }
   .scripture sup,
   .scripture .v {
     font-family: var(--sans); font-size: 0.62em; font-weight: 500; color: var(--rubric);
@@ -159,6 +169,12 @@
   <div class="read-top">
     <button class="back-btn" id="backBtn">&larr; Books</button>
     <div class="bookname" id="bookName"></div>
+    <div class="read-tools">
+      <button class="back-btn" id="sizeDown" title="Smaller text">A&minus;</button>
+      <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
+      <button class="back-btn" id="emailBtn" title="Email this chapter">&#9993; Email</button>
+      <button class="back-btn" id="emailEditBtn" title="Change email address">&#9998;</button>
+    </div>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
   <div id="reader"></div>
@@ -337,7 +353,7 @@ async function loadChapter(code, chapter) {
     </div>`;
 
   try {
-    let bodyHtml, fumsToken = null;
+    let bodyHtml, fumsToken = null, plainText = "";
     const [source, id] = splitSel(state.translation);
 
     if (source === "free") {
@@ -348,6 +364,7 @@ async function loadChapter(code, chapter) {
       if (!verses.length) throw new Error("No verses returned");
       bodyHtml = "<p>" + verses.map(v =>
         `<sup>${v.verse}</sup>${escapeHtml(v.text.trim())}`).join(" ") + "</p>";
+      plainText = verses.map(v => `${v.verse} ${v.text.trim().replace(/\s+/g, " ")}`).join("\n");
     } else {
       const url = `${API_BIBLE.endpoint}/v1/bibles/${id}/chapters/${code}.${chapter}` +
         `?content-type=html&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
@@ -358,7 +375,12 @@ async function loadChapter(code, chapter) {
       bodyHtml = json.data && json.data.content ? json.data.content : "";
       if (!bodyHtml) throw new Error("No content returned");
       fumsToken = (json.meta && (json.meta.fumsToken || json.meta.fumsId)) || null;
+      const tmp = document.createElement("div");
+      tmp.innerHTML = bodyHtml;
+      plainText = tmp.textContent.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
     }
+
+    currentChapter = { ref: `${name} ${chapter}`, trans: transName, text: plainText };
 
     reader.innerHTML = head + `<div class="scripture">${bodyHtml}</div>` + pager;
     if (chapter > 1) $("prevCh").addEventListener("click", () => loadChapter(code, chapter - 1));
@@ -379,6 +401,60 @@ function escapeHtml(s) {
 }
 
 /* ---------- Events ---------- */
+let currentChapter = null;
+
+/* Text size — steps applied to the scripture body, remembered per device */
+const SIZES = [0.95, 1.05, 1.16, 1.3, 1.5, 1.75];
+let sizeIdx = 2;
+try {
+  const s = parseInt(localStorage.getItem("bible.textSize"), 10);
+  if (!isNaN(s) && s >= 0 && s < SIZES.length) sizeIdx = s;
+} catch (e) {}
+function applySize() {
+  document.documentElement.style.setProperty("--fs", SIZES[sizeIdx] + "rem");
+  $("sizeDown").disabled = sizeIdx === 0;
+  $("sizeUp").disabled = sizeIdx === SIZES.length - 1;
+  try { localStorage.setItem("bible.textSize", sizeIdx); } catch (e) {}
+}
+$("sizeDown").addEventListener("click", () => { if (sizeIdx > 0) { sizeIdx--; applySize(); } });
+$("sizeUp").addEventListener("click", () => { if (sizeIdx < SIZES.length - 1) { sizeIdx++; applySize(); } });
+applySize();
+
+/* Email the current chapter via the device's mail app.
+   The recipient address is asked for once, then remembered as the default. */
+function getSavedEmail() {
+  try { return localStorage.getItem("bible.emailTo") || ""; } catch (e) { return ""; }
+}
+function saveEmail(addr) {
+  try { localStorage.setItem("bible.emailTo", addr); } catch (e) {}
+}
+
+$("emailBtn").addEventListener("click", () => {
+  if (!currentChapter) return;
+  let to = getSavedEmail();
+  if (!to) {
+    to = (window.prompt("Email address to send chapters to?\n(Saved as your default — use the \u270E button to change it later.)", "") || "").trim();
+    if (!to) return;
+    saveEmail(to);
+  }
+  const subject = `${currentChapter.ref} (${currentChapter.trans})`;
+  let body = currentChapter.text;
+  const MAX = 7000; // very long chapters can exceed what mailto links allow
+  if (body.length > MAX) {
+    body = body.slice(0, MAX) + "\n\n… (chapter continues — read the rest in the Bible app)";
+  }
+  body += "\n\n" + subject;
+  window.location.href =
+    `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+});
+
+$("emailEditBtn").addEventListener("click", () => {
+  const current = getSavedEmail();
+  const entry = window.prompt("Default email address for chapters:\n(Clear the box and press OK to remove it.)", current);
+  if (entry === null) return;            // cancelled — keep as-is
+  saveEmail(entry.trim());               // empty string clears the default
+});
+
 $("backBtn").addEventListener("click", () => {
   state.book = null;
   state.chapter = null;
