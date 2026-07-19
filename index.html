@@ -140,6 +140,62 @@
   .status { color: var(--muted); font-style: italic; margin-top: 1.5rem; }
   .status.error { color: var(--rubric); font-style: normal; font-family: var(--sans); font-size: 0.85rem; }
 
+  /* ---------- Verse selection & exegesis ---------- */
+  .verse { cursor: pointer; border-radius: 3px; }
+  .verse:hover { background: var(--hover); }
+  .verse.sel { background: #F5E6E6; box-shadow: 0 0 0 3px #F5E6E6; }
+  .sel-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    box-shadow: 0 4px 18px rgba(28,27,26,0.25);
+    z-index: 20;
+    max-width: min(92vw, 40rem);
+  }
+  .sel-bar .sel-ref {
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .sel-bar button {
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    background: none;
+    border: 1px solid rgba(253,253,251,0.35);
+    border-radius: 5px;
+    padding: 0.4rem 0.8rem;
+    color: var(--paper);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sel-bar button:hover { background: rgba(253,253,251,0.12); }
+  .sel-bar #exegesisBtn { border-color: transparent; background: var(--rubric); }
+  .toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
+    background: var(--rubric);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    border-radius: 6px;
+    padding: 0.55rem 0.9rem;
+    z-index: 21;
+    box-shadow: 0 4px 14px rgba(140,47,47,0.3);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .scripture { animation: fadein 0.25s ease; }
     @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
@@ -178,6 +234,12 @@
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
   <div id="reader"></div>
+  <div class="sel-bar" id="selBar" hidden>
+    <span class="sel-ref" id="selRef"></span>
+    <button id="exegesisBtn">&#10022; Exegesis</button>
+    <button id="selClearBtn">Clear</button>
+  </div>
+  <div class="toast" id="toast" hidden></div>
 </div>
 
 <script>
@@ -327,6 +389,9 @@ function openBook(code) {
     strip.appendChild(b);
   }
   $("reader").innerHTML = `<p class="welcome">Select a chapter of ${name}.</p>`;
+  selectedVerses.clear();
+  currentChapter = null;
+  updateSelBar();
   showView("readView");
 }
 
@@ -363,8 +428,9 @@ async function loadChapter(code, chapter) {
       const verses = data.verses || [];
       if (!verses.length) throw new Error("No verses returned");
       bodyHtml = "<p>" + verses.map(v =>
-        `<sup>${v.verse}</sup>${escapeHtml(v.text.trim())}`).join(" ") + "</p>";
+        `<span class="verse" data-v="${v.verse}"><sup>${v.verse}</sup>${escapeHtml(v.text.trim())}</span>`).join(" ") + "</p>";
       plainText = verses.map(v => `${v.verse} ${v.text.trim().replace(/\s+/g, " ")}`).join("\n");
+      chapterVerses = verses.map(v => ({ n: Number(v.verse), text: v.text.trim().replace(/\s+/g, " ") }));
     } else {
       const url = `${API_BIBLE.endpoint}/v1/bibles/${id}/chapters/${code}.${chapter}` +
         `?content-type=html&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
@@ -378,9 +444,12 @@ async function loadChapter(code, chapter) {
       const tmp = document.createElement("div");
       tmp.innerHTML = bodyHtml;
       plainText = tmp.textContent.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+      chapterVerses = null; // verse selection is available on public domain translations for now
     }
 
-    currentChapter = { ref: `${name} ${chapter}`, trans: transName, text: plainText };
+    currentChapter = { ref: `${name} ${chapter}`, book: name, chapter, trans: transName, text: plainText };
+    selectedVerses.clear();
+    updateSelBar();
 
     reader.innerHTML = head + `<div class="scripture">${bodyHtml}</div>` + pager;
     if (chapter > 1) $("prevCh").addEventListener("click", () => loadChapter(code, chapter - 1));
@@ -402,6 +471,83 @@ function escapeHtml(s) {
 
 /* ---------- Events ---------- */
 let currentChapter = null;
+let chapterVerses = null;             // [{n, text}] when the source provides verse data
+const selectedVerses = new Set();
+
+/* ---------- Verse selection & exegesis (prototype: hands off to Claude) ---------- */
+$("reader").addEventListener("click", (e) => {
+  const el = e.target.closest(".verse");
+  if (!el) return;
+  const n = Number(el.dataset.v);
+  if (selectedVerses.has(n)) selectedVerses.delete(n);
+  else selectedVerses.add(n);
+  el.classList.toggle("sel", selectedVerses.has(n));
+  updateSelBar();
+});
+
+function selRange() {
+  const ns = [...selectedVerses].sort((a, b) => a - b);
+  return ns.length ? [ns[0], ns[ns.length - 1]] : null;
+}
+
+function updateSelBar() {
+  const bar = $("selBar");
+  const r = selRange();
+  if (!r || !currentChapter) { bar.hidden = true; return; }
+  const [a, b] = r;
+  $("selRef").textContent = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
+  bar.hidden = false;
+}
+
+$("selClearBtn").addEventListener("click", () => {
+  selectedVerses.clear();
+  document.querySelectorAll(".verse.sel").forEach(el => el.classList.remove("sel"));
+  updateSelBar();
+});
+
+function buildExegesisPrompt() {
+  const [a, b] = selRange();
+  const ref = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
+  const passage = chapterVerses
+    .filter(v => v.n >= a && v.n <= b)
+    .map(v => `${v.n} ${v.text}`)
+    .join("\n");
+  return `Please provide a careful exegesis of ${ref} (${currentChapter.trans}).
+
+The passage:
+${passage}
+
+Please walk through:
+1. Context — where this passage sits in the structure of ${currentChapter.book} and its historical setting.
+2. Language — key terms in the original Hebrew or Greek and what they carry that English translation may not.
+3. Canon — how this passage connects to the wider sweep of Scripture, with cross-references.
+4. Theology — what this passage reveals about God, His character, and His purposes.
+5. Application — honest implications for a thoughtful Christian reader today. Where the text holds tension, hold it; do not resolve it into formulas.
+
+Audience: a theologically serious adult reader. Depth over devotional gloss.`;
+}
+
+function showToast(msg, ms = 3000) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.hidden = true; }, ms);
+}
+
+$("exegesisBtn").addEventListener("click", async () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  const promptText = buildExegesisPrompt();
+  // Open the tab first (must happen inside the tap), then copy.
+  const win = window.open("https://claude.ai/new", "_blank");
+  try {
+    await navigator.clipboard.writeText(promptText);
+    showToast("Exegesis prompt copied \u2014 paste it into Claude and send.");
+  } catch (e) {
+    if (win) win.close();
+    window.prompt("Copy this prompt, then paste it into Claude:", promptText);
+  }
+});
 
 /* Text size — steps applied to the scripture body, remembered per device */
 const SIZES = [0.95, 1.05, 1.16, 1.3, 1.5, 1.75];
@@ -458,6 +604,9 @@ $("emailEditBtn").addEventListener("click", () => {
 $("backBtn").addEventListener("click", () => {
   state.book = null;
   state.chapter = null;
+  selectedVerses.clear();
+  currentChapter = null;
+  updateSelBar();
   showView("booksView");
 });
 
