@@ -196,6 +196,48 @@
     box-shadow: 0 4px 14px rgba(140,47,47,0.3);
   }
 
+  /* ---------- Exegesis panel ---------- */
+  .exegesis-panel {
+    margin-top: 2rem;
+    border-left: 3px solid var(--rubric);
+    background: #F8F5F0;
+    padding: 1.1rem 1.4rem 1.3rem;
+    border-radius: 0 6px 6px 0;
+  }
+  .exegesis-panel .ex-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--rubric);
+    margin-bottom: 0.8rem;
+  }
+  .exegesis-panel .ex-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+  }
+  .exegesis-panel .ex-close:hover { color: var(--ink); }
+  .ex-body { font-size: calc(var(--fs, 1.16rem) * 0.9); line-height: 1.7; }
+  .ex-body p { margin-bottom: 0.7rem; }
+  .ex-body h3, .ex-body h4 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 1.02em;
+    margin: 1.1rem 0 0.4rem;
+  }
+  .ex-body ul, .ex-body ol { margin: 0.3rem 0 0.8rem 1.4rem; }
+  .ex-body li { margin-bottom: 0.25rem; }
+  .ex-body .ex-status { color: var(--muted); font-style: italic; }
+
   @media (prefers-reduced-motion: no-preference) {
     .scripture { animation: fadein 0.25s ease; }
     @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
@@ -230,6 +272,7 @@
       <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
       <button class="back-btn" id="emailBtn" title="Email this chapter">&#9993; Email</button>
       <button class="back-btn" id="emailEditBtn" title="Change email address">&#9998;</button>
+      <button class="back-btn" id="keyBtn" title="Anthropic API key for exegesis">&#128273;</button>
     </div>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
@@ -535,17 +578,143 @@ function showToast(msg, ms = 3000) {
   t._timer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
+/* ---------- Anthropic API key (yours, stored only in this browser) ---------- */
+function getApiKey() {
+  try { return localStorage.getItem("bible.anthropicKey") || ""; } catch (e) { return ""; }
+}
+function saveApiKey(k) {
+  try { localStorage.setItem("bible.anthropicKey", k); } catch (e) {}
+}
+function ensureApiKey() {
+  let k = getApiKey();
+  if (!k) {
+    k = (window.prompt(
+      "Paste your Anthropic API key (starts with sk-ant-).\nIt is stored only in this browser on this device \u2014 use the \uD83D\uDD11 button to change or remove it.", ""
+    ) || "").trim();
+    if (k) saveApiKey(k);
+  }
+  return k;
+}
+$("keyBtn").addEventListener("click", () => {
+  const entry = window.prompt(
+    "Anthropic API key for exegesis:\n(Clear the box and press OK to remove it from this device.)",
+    getApiKey()
+  );
+  if (entry === null) return;
+  saveApiKey(entry.trim());
+});
+
+/* ---------- Minimal markdown rendering for the exegesis text ---------- */
+function renderMd(src) {
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>");
+  const lines = escapeHtml(src).split("\n");
+  let html = "", para = [], list = null;
+  const flushPara = () => { if (para.length) { html += `<p>${inline(para.join(" "))}</p>`; para = []; } };
+  const closeList = () => { if (list) { html += list === "ul" ? "</ul>" : "</ol>"; list = null; } };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const h = line.match(/^(#{1,4})\s+(.*)/);
+    const ul = line.match(/^[-*]\s+(.*)/);
+    const ol = line.match(/^\d+[.)]\s+(.*)/);
+    if (h) { flushPara(); closeList(); html += `<${h[1].length <= 2 ? "h3" : "h4"}>${inline(h[2])}</${h[1].length <= 2 ? "h3" : "h4"}>`; }
+    else if (ul) { flushPara(); if (list !== "ul") { closeList(); html += "<ul>"; list = "ul"; } html += `<li>${inline(ul[1])}</li>`; }
+    else if (ol) { flushPara(); if (list !== "ol") { closeList(); html += "<ol>"; list = "ol"; } html += `<li>${inline(ol[1])}</li>`; }
+    else if (line.trim() === "") { flushPara(); closeList(); }
+    else para.push(line);
+  }
+  flushPara(); closeList();
+  return html;
+}
+
+/* ---------- Integrated exegesis via the Anthropic API ---------- */
+const EXEGESIS_MODEL = "claude-sonnet-4-6";
+
+function mountExegesisPanel(ref) {
+  const old = document.getElementById("exegesisPanel");
+  if (old) old.remove();
+  const panel = document.createElement("div");
+  panel.className = "exegesis-panel";
+  panel.id = "exegesisPanel";
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>Exegesis \u2014 ${ref}</span>
+      <button class="ex-close" title="Close">\u2715</button>
+    </div>
+    <div class="ex-body"><p class="ex-status">Preparing exegesis\u2026</p></div>`;
+  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  const reader = $("reader");
+  const pager = reader.querySelector(".pager");
+  if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  return panel.querySelector(".ex-body");
+}
+
 $("exegesisBtn").addEventListener("click", async () => {
   if (!currentChapter || !chapterVerses || !selRange()) return;
+  const key = ensureApiKey();
+  if (!key) return;
+
+  const [a, b] = selRange();
+  const ref = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
   const promptText = buildExegesisPrompt();
-  // Open the tab first (must happen inside the tap), then copy.
-  const win = window.open("https://claude.ai/new", "_blank");
+  const body = mountExegesisPanel(ref);
+  body.closest(".exegesis-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
+
   try {
-    await navigator.clipboard.writeText(promptText);
-    showToast("Exegesis prompt copied \u2014 paste it into Claude and send.");
-  } catch (e) {
-    if (win) win.close();
-    window.prompt("Copy this prompt, then paste it into Claude:", promptText);
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: EXEGESIS_MODEL,
+        max_tokens: 3000,
+        stream: true,
+        messages: [{ role: "user", content: promptText }]
+      })
+    });
+
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const j = await res.json(); msg = (j.error && j.error.message) || msg; } catch (e) {}
+      if (res.status === 401 || res.status === 403) {
+        saveApiKey("");
+        msg += " \u2014 the stored key was cleared; tap \uD83D\uDD11 to enter it again.";
+      }
+      body.innerHTML = `<p class="ex-status">Couldn't run the exegesis: ${escapeHtml(msg)}</p>`;
+      return;
+    }
+
+    // Stream the response into the panel as it is written
+    const sr = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "", fullText = "";
+    while (true) {
+      const { done, value } = await sr.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n");
+      buffer = parts.pop();
+      for (const line of parts) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
+            fullText += ev.delta.text;
+            body.innerHTML = renderMd(fullText);
+          }
+        } catch (e) { /* partial JSON across chunks is expected; skip */ }
+      }
+    }
+    if (!fullText) body.innerHTML = `<p class="ex-status">No text was returned \u2014 try again.</p>`;
+  } catch (err) {
+    body.innerHTML = `<p class="ex-status">Couldn't reach the Anthropic API (${escapeHtml(err.message)}). Check your connection and try again.</p>`;
   }
 });
 
