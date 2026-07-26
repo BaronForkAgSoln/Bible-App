@@ -237,6 +237,30 @@
   .ex-body ul, .ex-body ol { margin: 0.3rem 0 0.8rem 1.4rem; }
   .ex-body li { margin-bottom: 0.25rem; }
   .ex-body .ex-status { color: var(--muted); font-style: italic; }
+  .ex-tools { display: flex; align-items: center; gap: 0.15rem; }
+  .ex-copy {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+  }
+  .ex-copy:hover, .ex-copy:active { color: var(--ink); }
+  .sec-copy-row { padding: 0.1rem 0.2rem 0.75rem 1.1rem; }
+  .sec-copy {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.3rem 0.65rem;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .sec-copy:hover { background: var(--hover); color: var(--ink); }
+  .sec-copy:active { background: var(--hover); color: var(--rubric); }
   .summary-btn { margin-left: auto; align-self: center; }
   .ex-body details {
     border-top: 1px solid var(--rule);
@@ -687,19 +711,39 @@ function mountExegesisPanel(title) {
   panel.innerHTML = `
     <div class="ex-head">
       <span>${title}</span>
-      <button class="ex-close" title="Close">\u2715</button>
+      <div class="ex-tools">
+        <button class="ex-copy" title="Copy the whole study">&#x29C9;</button>
+        <button class="ex-close" title="Close">\u2715</button>
+      </div>
     </div>
     <div class="ex-body"><p class="ex-status">Preparing\u2026</p></div>`;
   panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
   const reader = $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
-  return panel.querySelector(".ex-body");
+  return panel;
+}
+
+/* Copy study text with attribution, e.g. "— Word Study · Exegesis — Genesis 1:1 (KJV)" */
+function copyStudyText(text, sectionName, meta) {
+  if (!text || !text.trim()) return;
+  const clean = text.replace(/^##\s+/gm, "").replace(/\*\*/g, "").trim();
+  const attribution = `\n\n\u2014 ${sectionName ? sectionName + " \u00B7 " : ""}${meta.title}${meta.trans ? " (" + meta.trans + ")" : ""}`;
+  const payload = clean + attribution;
+  const label = sectionName || "Study";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload)
+      .then(() => showToast(`${label} copied`))
+      .catch(() => window.prompt("Copy this text:", payload));
+  } else {
+    window.prompt("Copy this text:", payload);
+  }
 }
 
 /* Structured render: text before the first "## " stays visible (the distilled lead);
-   each "## " section becomes a collapsible block. Open/closed choices survive re-renders. */
-function renderStructured(src, openState) {
+   each "## " section becomes a collapsible block with its own copy button.
+   Open/closed choices survive re-renders. */
+function renderStructured(src, openState, sectionsOut) {
   const lines = src.split("\n");
   let lead = [], sections = [], cur = null;
   for (const line of lines) {
@@ -710,8 +754,11 @@ function renderStructured(src, openState) {
   }
   let html = `<div class="ex-lead">${renderMd(lead.join("\n"))}</div>`;
   for (const s of sections) {
+    const bodyText = s.body.join("\n");
+    if (sectionsOut) sectionsOut[s.title] = bodyText;
     const open = openState[s.title] ? " open" : "";
-    html += `<details data-sec="${escapeHtml(s.title)}"${open}><summary>${escapeHtml(s.title)}</summary>${renderMd(s.body.join("\n"))}</details>`;
+    html += `<details data-sec="${escapeHtml(s.title)}"${open}><summary>${escapeHtml(s.title)}</summary>${renderMd(bodyText)}` +
+      `<div class="sec-copy-row"><button class="sec-copy" data-sec="${escapeHtml(s.title)}">&#x29C9; Copy</button></div></details>`;
   }
   return html;
 }
@@ -719,7 +766,18 @@ function renderStructured(src, openState) {
 async function streamLens({ title, prompt, structured }) {
   const key = ensureApiKey();
   if (!key) return;
-  const body = mountExegesisPanel(title);
+  const panel = mountExegesisPanel(title);
+  const body = panel.querySelector(".ex-body");
+  const meta = {
+    title,
+    trans: currentChapter ? currentChapter.trans.split("\u2014")[0].trim() : ""
+  };
+  const ctx = { full: "", sections: {} };
+  panel.querySelector(".ex-copy").addEventListener("click", () => copyStudyText(ctx.full, null, meta));
+  body.addEventListener("click", (e) => {
+    const b = e.target.closest(".sec-copy");
+    if (b) copyStudyText(ctx.sections[b.dataset.sec] || "", b.dataset.sec, meta);
+  });
   const openState = {};
   if (structured) {
     body.addEventListener("toggle", (e) => {
@@ -727,7 +785,7 @@ async function streamLens({ title, prompt, structured }) {
       if (d && d.dataset && d.dataset.sec) openState[d.dataset.sec] = d.open;
     }, true);
   }
-  body.closest(".exegesis-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -774,7 +832,13 @@ async function streamLens({ title, prompt, structured }) {
           const ev = JSON.parse(payload);
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
             fullText += ev.delta.text;
-            body.innerHTML = structured ? renderStructured(fullText, openState) : renderMd(fullText);
+            ctx.full = fullText;
+            if (structured) {
+              ctx.sections = {};
+              body.innerHTML = renderStructured(fullText, openState, ctx.sections);
+            } else {
+              body.innerHTML = renderMd(fullText);
+            }
           }
         } catch (e) { /* partial JSON across chunks is expected; skip */ }
       }
