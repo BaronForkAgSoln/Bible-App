@@ -237,28 +237,25 @@
   .ex-body ul, .ex-body ol { margin: 0.3rem 0 0.8rem 1.4rem; }
   .ex-body li { margin-bottom: 0.25rem; }
   .ex-body .ex-status { color: var(--muted); font-style: italic; }
-  .ex-tools { display: flex; align-items: center; gap: 0.15rem; }
-  .ex-copy {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 0.95rem;
-    cursor: pointer;
-    padding: 0.2rem 0.4rem;
-  }
-  .ex-copy:hover, .ex-copy:active { color: var(--ink); }
-  .sec-copy-row { padding: 0.1rem 0.2rem 0.75rem 1.1rem; }
+  .ex-tools { display: flex; align-items: center; gap: 0.4rem; }
+  .ex-head .sec-copy.head-copy { display: inline-block; }
+  .ex-body summary { display: flex; align-items: center; }
+  .ex-body summary .sec-title { flex: 1; }
   .sec-copy {
     font-family: var(--sans);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
+    font-weight: 500;
     letter-spacing: 0.05em;
+    text-transform: none;
     background: none;
     border: 1px solid var(--rule);
     border-radius: 4px;
-    padding: 0.3rem 0.65rem;
+    padding: 0.25rem 0.6rem;
     color: var(--muted);
     cursor: pointer;
+    display: none;
   }
+  .ex-body details[open] > summary .sec-copy { display: inline-block; }
   .sec-copy:hover { background: var(--hover); color: var(--ink); }
   .sec-copy:active { background: var(--hover); color: var(--rubric); }
   .summary-btn { margin-left: auto; align-self: center; }
@@ -702,7 +699,7 @@ function renderMd(src) {
 /* ---------- Integrated study lenses via the Anthropic API ---------- */
 const EXEGESIS_MODEL = "claude-sonnet-4-6";
 
-function mountExegesisPanel(title) {
+function mountExegesisPanel(title, withHeaderCopy) {
   const old = document.getElementById("exegesisPanel");
   if (old) old.remove();
   const panel = document.createElement("div");
@@ -712,7 +709,7 @@ function mountExegesisPanel(title) {
     <div class="ex-head">
       <span>${title}</span>
       <div class="ex-tools">
-        <button class="ex-copy" title="Copy the whole study">&#x29C9;</button>
+        ${withHeaderCopy ? `<button class="sec-copy head-copy">&#x29C9; Copy</button>` : ""}
         <button class="ex-close" title="Close">\u2715</button>
       </div>
     </div>
@@ -730,7 +727,7 @@ function copyStudyText(text, sectionName, meta) {
   const clean = text.replace(/^##\s+/gm, "").replace(/\*\*/g, "").trim();
   const attribution = `\n\n\u2014 ${sectionName ? sectionName + " \u00B7 " : ""}${meta.title}${meta.trans ? " (" + meta.trans + ")" : ""}`;
   const payload = clean + attribution;
-  const label = sectionName || "Study";
+  const label = sectionName || meta.label || "Study";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(payload)
       .then(() => showToast(`${label} copied`))
@@ -757,8 +754,8 @@ function renderStructured(src, openState, sectionsOut) {
     const bodyText = s.body.join("\n");
     if (sectionsOut) sectionsOut[s.title] = bodyText;
     const open = openState[s.title] ? " open" : "";
-    html += `<details data-sec="${escapeHtml(s.title)}"${open}><summary>${escapeHtml(s.title)}</summary>${renderMd(bodyText)}` +
-      `<div class="sec-copy-row"><button class="sec-copy" data-sec="${escapeHtml(s.title)}">&#x29C9; Copy</button></div></details>`;
+    html += `<details data-sec="${escapeHtml(s.title)}"${open}><summary><span class="sec-title">${escapeHtml(s.title)}</span>` +
+      `<button class="sec-copy" data-sec="${escapeHtml(s.title)}">&#x29C9; Copy</button></summary>${renderMd(bodyText)}</details>`;
   }
   return html;
 }
@@ -766,17 +763,23 @@ function renderStructured(src, openState, sectionsOut) {
 async function streamLens({ title, prompt, structured }) {
   const key = ensureApiKey();
   if (!key) return;
-  const panel = mountExegesisPanel(title);
+  const panel = mountExegesisPanel(title, !structured);
   const body = panel.querySelector(".ex-body");
   const meta = {
     title,
+    label: title.split("\u2014")[0].trim(),
     trans: currentChapter ? currentChapter.trans.split("\u2014")[0].trim() : ""
   };
   const ctx = { full: "", sections: {} };
-  panel.querySelector(".ex-copy").addEventListener("click", () => copyStudyText(ctx.full, null, meta));
+  const headCopy = panel.querySelector(".head-copy");
+  if (headCopy) headCopy.addEventListener("click", () => copyStudyText(ctx.full, null, meta));
   body.addEventListener("click", (e) => {
     const b = e.target.closest(".sec-copy");
-    if (b) copyStudyText(ctx.sections[b.dataset.sec] || "", b.dataset.sec, meta);
+    if (b) {
+      e.preventDefault();
+      e.stopPropagation();
+      copyStudyText(ctx.sections[b.dataset.sec] || "", b.dataset.sec, meta);
+    }
   });
   const openState = {};
   if (structured) {
