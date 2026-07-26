@@ -144,6 +144,7 @@
   .verse { cursor: pointer; border-radius: 3px; }
   .verse:hover { background: var(--hover); }
   .verse.sel { background: #F5E6E6; box-shadow: 0 0 0 3px #F5E6E6; }
+  .sel-bar[hidden] { display: none; }
   .sel-bar {
     position: fixed;
     left: 50%;
@@ -180,7 +181,6 @@
     white-space: nowrap;
   }
   .sel-bar button:hover { background: rgba(253,253,251,0.12); }
-  .sel-bar #exegesisBtn { border-color: transparent; background: var(--rubric); }
   .toast {
     position: fixed;
     left: 50%;
@@ -237,11 +237,56 @@
   .ex-body ul, .ex-body ol { margin: 0.3rem 0 0.8rem 1.4rem; }
   .ex-body li { margin-bottom: 0.25rem; }
   .ex-body .ex-status { color: var(--muted); font-style: italic; }
+  .summary-btn { margin-left: auto; align-self: center; }
+  .ex-body details {
+    border-top: 1px solid var(--rule);
+    padding: 0.15rem 0;
+  }
+  .ex-body details:last-of-type { border-bottom: 1px solid var(--rule); }
+  .ex-body summary {
+    font-family: var(--sans);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 0.55rem 0.2rem;
+    list-style: none;
+  }
+  .ex-body summary::-webkit-details-marker { display: none; }
+  .ex-body summary::before {
+    content: "+";
+    color: var(--rubric);
+    display: inline-block;
+    width: 1.1rem;
+    font-weight: 500;
+  }
+  .ex-body details[open] > summary::before { content: "\2212"; }
+  .ex-body details > *:not(summary) { padding: 0.1rem 0.2rem 0.6rem 1.1rem; }
+  .ex-lead { margin-bottom: 0.9rem; }
+  .ex-lead p { margin-bottom: 0.4rem; }
 
   @media (prefers-reduced-motion: no-preference) {
     .scripture { animation: fadein 0.25s ease; }
     @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
   }
+
+  /* ---------- Touch feedback (iPad has no hover) ---------- */
+  button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .back-btn:active,
+  .book-grid button:not(:disabled):active,
+  .chapter-strip button:active,
+  .pager button:active {
+    background: var(--hover);
+    transform: scale(0.97);
+  }
+  .book-grid button:not(:disabled):active { border-color: var(--rubric); }
+  .chapter-strip button.active:active { background: var(--rubric); }
+  .sel-bar button:active { background: rgba(253,253,251,0.22); transform: scale(0.97); }
+  .sel-bar #exegesisBtn:active,
+  .sel-bar #reflectBtn:active { background: var(--rubric); border-color: var(--rubric); }
+  .ex-close:active { color: var(--rubric); }
 </style>
 </head>
 <body>
@@ -280,6 +325,7 @@
   <div class="sel-bar" id="selBar" hidden>
     <span class="sel-ref" id="selRef"></span>
     <button id="exegesisBtn">&#10022; Exegesis</button>
+    <button id="reflectBtn">Devotional</button>
     <button id="selClearBtn">Clear</button>
   </div>
   <div class="toast" id="toast" hidden></div>
@@ -453,6 +499,7 @@ async function loadChapter(code, chapter) {
     <div class="passage-head">
       <span class="chapnum">${chapter}</span>
       <div class="transname">${transName}</div>
+      <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
     </div>`;
   const pager = `
     <div class="pager">
@@ -497,6 +544,7 @@ async function loadChapter(code, chapter) {
     reader.innerHTML = head + `<div class="scripture">${bodyHtml}</div>` + pager;
     if (chapter > 1) $("prevCh").addEventListener("click", () => loadChapter(code, chapter - 1));
     if (chapter < chapterCount) $("nextCh").addEventListener("click", () => loadChapter(code, chapter + 1));
+    $("summaryBtn").addEventListener("click", runChapterSummary);
     reportFums(fumsToken);
   } catch (err) {
     reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
@@ -547,28 +595,6 @@ $("selClearBtn").addEventListener("click", () => {
   document.querySelectorAll(".verse.sel").forEach(el => el.classList.remove("sel"));
   updateSelBar();
 });
-
-function buildExegesisPrompt() {
-  const [a, b] = selRange();
-  const ref = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
-  const passage = chapterVerses
-    .filter(v => v.n >= a && v.n <= b)
-    .map(v => `${v.n} ${v.text}`)
-    .join("\n");
-  return `Please provide a careful exegesis of ${ref} (${currentChapter.trans}).
-
-The passage:
-${passage}
-
-Please walk through:
-1. Context — where this passage sits in the structure of ${currentChapter.book} and its historical setting.
-2. Language — key terms in the original Hebrew or Greek and what they carry that English translation may not.
-3. Canon — how this passage connects to the wider sweep of Scripture, with cross-references.
-4. Theology — what this passage reveals about God, His character, and His purposes.
-5. Application — honest implications for a thoughtful Christian reader today. Where the text holds tension, hold it; do not resolve it into formulas.
-
-Audience: a theologically serious adult reader. Depth over devotional gloss.`;
-}
 
 function showToast(msg, ms = 3000) {
   const t = $("toast");
@@ -628,10 +654,10 @@ function renderMd(src) {
   return html;
 }
 
-/* ---------- Integrated exegesis via the Anthropic API ---------- */
+/* ---------- Integrated study lenses via the Anthropic API ---------- */
 const EXEGESIS_MODEL = "claude-sonnet-4-6";
 
-function mountExegesisPanel(ref) {
+function mountExegesisPanel(title) {
   const old = document.getElementById("exegesisPanel");
   if (old) old.remove();
   const panel = document.createElement("div");
@@ -639,10 +665,10 @@ function mountExegesisPanel(ref) {
   panel.id = "exegesisPanel";
   panel.innerHTML = `
     <div class="ex-head">
-      <span>Exegesis \u2014 ${ref}</span>
+      <span>${title}</span>
       <button class="ex-close" title="Close">\u2715</button>
     </div>
-    <div class="ex-body"><p class="ex-status">Preparing exegesis\u2026</p></div>`;
+    <div class="ex-body"><p class="ex-status">Preparing\u2026</p></div>`;
   panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
   const reader = $("reader");
   const pager = reader.querySelector(".pager");
@@ -650,15 +676,36 @@ function mountExegesisPanel(ref) {
   return panel.querySelector(".ex-body");
 }
 
-$("exegesisBtn").addEventListener("click", async () => {
-  if (!currentChapter || !chapterVerses || !selRange()) return;
+/* Structured render: text before the first "## " stays visible (the distilled lead);
+   each "## " section becomes a collapsible block. Open/closed choices survive re-renders. */
+function renderStructured(src, openState) {
+  const lines = src.split("\n");
+  let lead = [], sections = [], cur = null;
+  for (const line of lines) {
+    const m = line.match(/^##\s+(.*)/);
+    if (m) { cur = { title: m[1].replace(/[*#]/g, "").split("\u2014")[0].trim(), body: [] }; sections.push(cur); }
+    else if (cur) cur.body.push(line);
+    else lead.push(line);
+  }
+  let html = `<div class="ex-lead">${renderMd(lead.join("\n"))}</div>`;
+  for (const s of sections) {
+    const open = openState[s.title] ? " open" : "";
+    html += `<details data-sec="${escapeHtml(s.title)}"${open}><summary>${escapeHtml(s.title)}</summary>${renderMd(s.body.join("\n"))}</details>`;
+  }
+  return html;
+}
+
+async function streamLens({ title, prompt, structured }) {
   const key = ensureApiKey();
   if (!key) return;
-
-  const [a, b] = selRange();
-  const ref = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
-  const promptText = buildExegesisPrompt();
-  const body = mountExegesisPanel(ref);
+  const body = mountExegesisPanel(title);
+  const openState = {};
+  if (structured) {
+    body.addEventListener("toggle", (e) => {
+      const d = e.target;
+      if (d && d.dataset && d.dataset.sec) openState[d.dataset.sec] = d.open;
+    }, true);
+  }
   body.closest(".exegesis-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
 
   try {
@@ -674,7 +721,7 @@ $("exegesisBtn").addEventListener("click", async () => {
         model: EXEGESIS_MODEL,
         max_tokens: 3000,
         stream: true,
-        messages: [{ role: "user", content: promptText }]
+        messages: [{ role: "user", content: prompt }]
       })
     });
 
@@ -685,11 +732,10 @@ $("exegesisBtn").addEventListener("click", async () => {
         saveApiKey("");
         msg += " \u2014 the stored key was cleared; tap \uD83D\uDD11 to enter it again.";
       }
-      body.innerHTML = `<p class="ex-status">Couldn't run the exegesis: ${escapeHtml(msg)}</p>`;
+      body.innerHTML = `<p class="ex-status">Couldn't run this: ${escapeHtml(msg)}</p>`;
       return;
     }
 
-    // Stream the response into the panel as it is written
     const sr = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "", fullText = "";
@@ -707,7 +753,7 @@ $("exegesisBtn").addEventListener("click", async () => {
           const ev = JSON.parse(payload);
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
             fullText += ev.delta.text;
-            body.innerHTML = renderMd(fullText);
+            body.innerHTML = structured ? renderStructured(fullText, openState) : renderMd(fullText);
           }
         } catch (e) { /* partial JSON across chunks is expected; skip */ }
       }
@@ -716,7 +762,79 @@ $("exegesisBtn").addEventListener("click", async () => {
   } catch (err) {
     body.innerHTML = `<p class="ex-status">Couldn't reach the Anthropic API (${escapeHtml(err.message)}). Check your connection and try again.</p>`;
   }
+}
+
+/* ---------- The three lenses ---------- */
+function selectedPassage() {
+  const [a, b] = selRange();
+  return {
+    ref: `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`,
+    text: chapterVerses.filter(v => v.n >= a && v.n <= b).map(v => `${v.n} ${v.text}`).join("\n")
+  };
+}
+
+function buildExegesisPrompt() {
+  const { ref, text } = selectedPassage();
+  return `Please provide a careful exegesis of ${ref} (${currentChapter.trans}).
+
+The passage:
+${text}
+
+Begin with exactly these two lines, nothing before them:
+**Key Takeaway:** <one sentence \u2014 the heart of the passage>
+**Word of Wisdom:** <one short, proverb-like line worth carrying through the week>
+
+Then walk through these sections, each beginning with a "## " header line, each roughly 100\u2013170 words:
+## Context
+Where this passage sits in the structure of ${currentChapter.book} and its historical setting.
+## Language
+Key terms in the original Hebrew or Greek and what they carry that English translation may not.
+## Canon
+How this passage connects to the wider sweep of Scripture, with cross-references.
+## Theology
+What this passage reveals about God, His character, and His purposes.
+## Application
+Honest implications for a thoughtful Christian reader today. Where the text holds tension, hold it; do not resolve it into formulas.
+
+Audience: a theologically serious adult reader. Depth over devotional gloss.`;
+}
+
+function buildReflectionPrompt() {
+  const { ref, text } = selectedPassage();
+  return `Write a short pastoral reflection (about 180\u2013220 words) on ${ref} (${currentChapter.trans}).
+
+The passage:
+${text}
+
+Voice: warm, honest, unhurried \u2014 a wise elder speaking with a fellow believer, not lecturing. Draw out what this passage asks of the reader's heart and life today. Where the text holds tension, hold it; do not resolve it into formulas. Flowing prose, no headers.
+
+End with exactly these two lines:
+**Key Takeaway:** <one sentence>
+**Word of Wisdom:** <one short, proverb-like line>`;
+}
+
+$("exegesisBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  const { ref } = selectedPassage();
+  streamLens({ title: `Exegesis \u2014 ${ref}`, prompt: buildExegesisPrompt(), structured: true });
 });
+
+$("reflectBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  const { ref } = selectedPassage();
+  streamLens({ title: `Devotional \u2014 ${ref}`, prompt: buildReflectionPrompt(), structured: false });
+});
+
+function runChapterSummary() {
+  if (!currentChapter) return;
+  const prompt = `Provide a concise orientation to ${currentChapter.ref} (${currentChapter.trans}).
+
+In about 150\u2013200 words of flowing prose (no headers): where this chapter sits in the flow and structure of ${currentChapter.book}, what happens in it or what is argued, and the two or three themes that matter most for understanding it.
+
+End with exactly this line:
+**Key Takeaway:** <one sentence for this chapter>`;
+  streamLens({ title: `Chapter Summary \u2014 ${currentChapter.ref}`, prompt, structured: false });
+}
 
 /* Text size — steps applied to the scripture body, remembered per device */
 const SIZES = [0.95, 1.05, 1.16, 1.3, 1.5, 1.75];
@@ -792,6 +910,9 @@ transSelect.addEventListener("change", () => {
 });
 
 /* ---------- Init ---------- */
+// iOS Safari only honors :active styles once a touchstart listener exists
+document.addEventListener("touchstart", () => {}, { passive: true });
+
 function restoreSavedTranslation() {
   let saved = null;
   try { saved = localStorage.getItem("bible.defaultTranslation"); } catch (e) {}
