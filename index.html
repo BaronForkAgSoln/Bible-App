@@ -286,6 +286,23 @@
   .sel-bar button:active { background: rgba(253,253,251,0.22); transform: scale(0.97); }
   .sel-bar #exegesisBtn:active,
   .sel-bar #reflectBtn:active { background: var(--rubric); border-color: var(--rubric); }
+
+  /* Narrow phones: reference on its own line, buttons beneath, everything on screen */
+  @media (max-width: 480px) {
+    .sel-bar {
+      flex-wrap: wrap;
+      justify-content: center;
+      row-gap: 0.45rem;
+      padding: 0.55rem 0.8rem;
+      max-width: 94vw;
+    }
+    .sel-bar .sel-ref {
+      flex-basis: 100%;
+      text-align: center;
+      font-size: 0.76rem;
+    }
+    .sel-bar button { font-size: 0.74rem; padding: 0.35rem 0.65rem; }
+  }
   .ex-close:active { color: var(--rubric); }
 </style>
 </head>
@@ -324,9 +341,9 @@
   <div id="reader"></div>
   <div class="sel-bar" id="selBar" hidden>
     <span class="sel-ref" id="selRef"></span>
-    <button id="exegesisBtn">&#10022; Exegesis</button>
+    <button id="exegesisBtn">Exegesis</button>
     <button id="reflectBtn">Devotional</button>
-    <button id="selClearBtn">Clear</button>
+    <button id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
 </div>
@@ -570,9 +587,13 @@ $("reader").addEventListener("click", (e) => {
   const el = e.target.closest(".verse");
   if (!el) return;
   const n = Number(el.dataset.v);
-  if (selectedVerses.has(n)) selectedVerses.delete(n);
-  else selectedVerses.add(n);
-  el.classList.toggle("sel", selectedVerses.has(n));
+  const wasSelected = selectedVerses.has(n);
+  selectedVerses.clear();
+  document.querySelectorAll(".verse.sel").forEach(v => v.classList.remove("sel"));
+  if (!wasSelected) {
+    selectedVerses.add(n);
+    el.classList.add("sel");
+  }
   updateSelBar();
 });
 
@@ -637,7 +658,7 @@ function renderMd(src) {
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
   const lines = escapeHtml(src).split("\n");
   let html = "", para = [], list = null;
-  const flushPara = () => { if (para.length) { html += `<p>${inline(para.join(" "))}</p>`; para = []; } };
+  const flushPara = () => { if (para.length) { html += `<p>${inline(para.join("<br>"))}</p>`; para = []; } };
   const closeList = () => { if (list) { html += list === "ul" ? "</ul>" : "</ol>"; list = null; } };
   for (const raw of lines) {
     const line = raw.trimEnd();
@@ -775,6 +796,10 @@ function selectedPassage() {
 
 function buildExegesisPrompt() {
   const { ref, text } = selectedPassage();
+  const [a, b] = selRange();
+  const wordScope = (b - a + 1) <= 2
+    ? `Every distinct Hebrew or Greek word in the passage, as a Strong's Concordance tags them \u2014 including particles and untranslated words (e.g., the object marker \u05D0\u05B5\u05EA, H853) \u2014 in the order they appear`
+    : `The 5\u20138 most significant words in the original Hebrew or Greek`;
   return `Please provide a careful exegesis of ${ref} (${currentChapter.trans}).
 
 The passage:
@@ -787,8 +812,12 @@ Begin with exactly these two lines, nothing before them:
 Then walk through these sections, each beginning with a "## " header line, each roughly 100\u2013170 words:
 ## Context
 Where this passage sits in the structure of ${currentChapter.book} and its historical setting.
-## Language
-Key terms in the original Hebrew or Greek and what they carry that English translation may not.
+## Word Study
+Open this section with the passage as a whole, interlinear-style, one labeled line each (per verse if more than one verse is selected):
+**Hebrew:** (or **Greek:**) <the full original text of the passage in its own script>
+**Transliteration:** <the full transliteration>
+**${currentChapter.trans.split("\u2014")[0].trim()}:** <the passage as given above>
+Then the word entries. ${wordScope}, Strong's Concordance\u2013style: the original word in its own script, transliteration, Strong's number (omit the number rather than guess if uncertain), root meaning, notable uses elsewhere in Scripture, and what the English translation may flatten. Give each word its own short entry; brief entries are fine for minor words. This section may run longer than the others when needed to cover the words.
 ## Canon
 How this passage connects to the wider sweep of Scripture, with cross-references.
 ## Theology
