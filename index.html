@@ -325,6 +325,95 @@
     .sel-bar button { font-size: 0.74rem; padding: 0.35rem 0.65rem; }
   }
   .ex-close:active { color: var(--rubric); }
+
+  /* ---------- Daily Devotional ---------- */
+  .daily-btn {
+    display: block;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    background: none;
+    border: 1px solid var(--rubric);
+    border-radius: 6px;
+    padding: 0.7rem;
+    margin-bottom: 1.6rem;
+    color: var(--rubric);
+    cursor: pointer;
+  }
+  .daily-btn:hover { background: var(--hover); }
+  .daily-btn:active { background: #F5E6E6; transform: scale(0.99); }
+  #dailyReader { max-width: 44rem; }
+  .daily-ask {
+    background: #F8F5F0;
+    border-left: 3px solid var(--rubric);
+    border-radius: 0 6px 6px 0;
+    padding: 18px 20px;
+  }
+  .daily-ask .ask-head {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--rubric);
+    margin-bottom: 12px;
+  }
+  .daily-ask .ask-q { font-size: 1.15rem; margin: 0 0 4px; }
+  .daily-ask .ask-sub { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); margin: 0 0 14px; }
+  .daily-ask .ask-row { display: flex; gap: 8px; align-items: stretch; }
+  .daily-ask textarea {
+    flex: 1;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 9px 12px;
+    resize: none;
+    min-height: 42px;
+    line-height: 1.4;
+  }
+  .daily-ask textarea:focus-visible { outline: 2px solid var(--rubric); outline-offset: 1px; }
+  .daily-ask .ask-begin {
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    background: var(--rubric);
+    color: var(--paper);
+    border: none;
+    border-radius: 6px;
+    padding: 0 18px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .daily-ask .ask-begin:active { background: #762727; }
+  @media (max-width: 480px) {
+    .daily-ask .ask-row { flex-direction: column; }
+    .daily-ask .ask-begin { padding: 10px; }
+  }
+
+  /* ---------- Waiting state (before streaming begins) ---------- */
+  .ex-wait { display: flex; align-items: center; gap: 0.6rem; color: var(--muted); }
+  .ex-spinner {
+    width: 15px; height: 15px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--rubric);
+    border-radius: 50%;
+    flex: none;
+    animation: exspin 0.8s linear infinite;
+  }
+  .ex-wait-text { font-family: var(--sans); font-size: 0.82rem; font-style: normal; }
+  @keyframes exspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
+  }
+  @keyframes exbreathe { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ex-spinner { animation-duration: 1.6s; }
+  }
 </style>
 </head>
 <body>
@@ -339,10 +428,20 @@
 
 <!-- Page 1: books -->
 <div class="view show" id="booksView">
+  <button class="daily-btn" id="dailyBtn">&#10087; Daily Devotional</button>
   <div class="testament-label">Old Testament</div>
   <div class="book-grid" id="otGrid"></div>
   <div class="testament-label">New Testament</div>
   <div class="book-grid" id="ntGrid"></div>
+</div>
+
+<!-- Daily Devotional view -->
+<div class="view" id="dailyView">
+  <div class="read-top">
+    <button class="back-btn" id="dailyBackBtn">&larr; Books</button>
+    <div class="bookname">Daily Devotional</div>
+  </div>
+  <div id="dailyReader"></div>
 </div>
 
 <!-- Page 2: chapters + reading -->
@@ -699,7 +798,7 @@ function renderMd(src) {
 /* ---------- Integrated study lenses via the Anthropic API ---------- */
 const EXEGESIS_MODEL = "claude-sonnet-4-6";
 
-function mountExegesisPanel(title, withHeaderCopy) {
+function mountExegesisPanel(title, withHeaderCopy, target) {
   const old = document.getElementById("exegesisPanel");
   if (old) old.remove();
   const panel = document.createElement("div");
@@ -715,7 +814,7 @@ function mountExegesisPanel(title, withHeaderCopy) {
     </div>
     <div class="ex-body"><p class="ex-status">Preparing\u2026</p></div>`;
   panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
-  const reader = $("reader");
+  const reader = target || $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
   return panel;
@@ -760,12 +859,12 @@ function renderStructured(src, openState, sectionsOut) {
   return html;
 }
 
-async function streamLens({ title, prompt, structured }) {
+async function streamLens({ title, prompt, structured, target, metaOverride }) {
   const key = ensureApiKey();
   if (!key) return;
-  const panel = mountExegesisPanel(title, !structured);
+  const panel = mountExegesisPanel(title, !structured, target);
   const body = panel.querySelector(".ex-body");
-  const meta = {
+  const meta = metaOverride || {
     title,
     label: title.split("\u2014")[0].trim(),
     trans: currentChapter ? currentChapter.trans.split("\u2014")[0].trim() : ""
@@ -790,6 +889,17 @@ async function streamLens({ title, prompt, structured }) {
   }
   panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
+  // Waiting state: spinner + a status line that advances if the wait runs long
+  const waitMsgs = ["Preparing\u2026", "Reading the passage\u2026", "Gathering the words\u2026"];
+  let waitStep = 0;
+  body.innerHTML = `<div class="ex-wait"><div class="ex-spinner"></div><span class="ex-wait-text">${waitMsgs[0]}</span></div>`;
+  const waitTimer = setInterval(() => {
+    waitStep++;
+    const el = body.querySelector(".ex-wait-text");
+    if (el && waitStep < waitMsgs.length) el.textContent = waitMsgs[waitStep];
+  }, 2500);
+  let streamStarted = false;
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -808,6 +918,7 @@ async function streamLens({ title, prompt, structured }) {
     });
 
     if (!res.ok) {
+      clearInterval(waitTimer);
       let msg = `HTTP ${res.status}`;
       try { const j = await res.json(); msg = (j.error && j.error.message) || msg; } catch (e) {}
       if (res.status === 401 || res.status === 403) {
@@ -834,6 +945,7 @@ async function streamLens({ title, prompt, structured }) {
         try {
           const ev = JSON.parse(payload);
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
+            if (!streamStarted) { streamStarted = true; clearInterval(waitTimer); }
             fullText += ev.delta.text;
             ctx.full = fullText;
             if (structured) {
@@ -848,6 +960,7 @@ async function streamLens({ title, prompt, structured }) {
     }
     if (!fullText) body.innerHTML = `<p class="ex-status">No text was returned \u2014 try again.</p>`;
   } catch (err) {
+    clearInterval(waitTimer);
     body.innerHTML = `<p class="ex-status">Couldn't reach the Anthropic API (${escapeHtml(err.message)}). Check your connection and try again.</p>`;
   }
 }
@@ -931,6 +1044,84 @@ End with exactly this line:
 **Key Takeaway:** <one sentence for this chapter>`;
   streamLens({ title: `Chapter Summary \u2014 ${currentChapter.ref}`, prompt, structured: false });
 }
+
+/* ---------- Daily Devotional ---------- */
+function currentTransName() {
+  const t = transSelect.options[transSelect.selectedIndex];
+  return t ? t.text.split("\u2014")[0].trim() : "KJV";
+}
+
+function showDailyAsk() {
+  const el = $("dailyReader");
+  el.innerHTML = `
+    <div class="daily-ask" id="dailyAsk">
+      <div class="ask-head">Daily Devotional \u2014 ${dailyDateLabel()}</div>
+      <p class="ask-q">What is on your heart today?</p>
+      <p class="ask-sub">A word, a name, a burden \u2014 or leave it blank.</p>
+      <div class="ask-row">
+        <textarea id="dailyInput" rows="1" placeholder="Optional"></textarea>
+        <button class="ask-begin" id="dailyBegin">Begin</button>
+      </div>
+    </div>`;
+  const input = $("dailyInput");
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runDailyDevotional(); }
+  });
+  $("dailyBegin").addEventListener("click", runDailyDevotional);
+  showView("dailyView");
+  setTimeout(() => input.focus(), 50);
+}
+
+function dailyDateLabel() {
+  return new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" });
+}
+
+function buildDailyPrompt(onHeart) {
+  const trans = currentTransName();
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const heartLine = onHeart
+    ? `Today the reader shared what is on their heart: "${onHeart}"\nLet this quietly shape which passage you choose and what you say \u2014 but do not repeat their words back to them or name their situation. Respond as one who already understands, not as one confirming receipt.`
+    : `The reader did not share anything specific today. Choose a passage well-suited to an ordinary day \u2014 you may let the day of the week or season (today is ${today}) gently inform the choice \u2014 and vary your choice from what a predictable pick would be.`;
+  return `Write a short daily devotional in the ${trans} translation.
+
+${heartLine}
+
+Structure \u2014 follow it exactly:
+1. Open directly with Scripture. No introductory sentence, no greeting, no framing before it. Quote one passage, or two short passages that speak to one another, each followed by its reference on its own line. Use the ${trans} wording.
+2. Then a few plain words \u2014 three to five sentences \u2014 drawing the passage toward the reader's day. Not exposition, not a lecture; a wise friend's gentle gloss. Never clever or aphoristic for its own sake.
+3. Close with one or two sentences of blessing \u2014 a word to carry \u2014 in its own voice, with no label or heading over it.
+
+Voice: warm, plain, unhurried. Let Scripture do the heavy work; keep your own words few. No headers, no "Key Takeaway," no "Word of Wisdom," no section labels anywhere. If what the reader shared is heavy, meet it with steadiness and Scripture and point them toward God and the people in their life \u2014 never offer medical assurance or act as a counselor.
+
+Format the two Scripture references and any emphasis in the closing simply. Begin now with the Scripture.`;
+}
+
+function runDailyDevotional() {
+  const input = $("dailyInput");
+  const onHeart = input ? input.value.trim() : "";
+  const meta = { title: `Daily Devotional \u2014 ${dailyDateLabel()}`, label: "Daily Devotional", trans: currentTransName() };
+  const ask = $("dailyAsk");
+  if (ask) ask.remove();
+  streamLens({
+    title: `Daily Devotional \u2014 ${dailyDateLabel()}`,
+    prompt: buildDailyPrompt(onHeart),
+    structured: false,
+    target: $("dailyReader"),
+    metaOverride: meta
+  });
+  // When this devotional's panel is closed, return to the question screen
+  const panel = document.getElementById("exegesisPanel");
+  if (panel) {
+    panel.querySelector(".ex-close").addEventListener("click", () => {
+      if ($("dailyView").classList.contains("show")) showDailyAsk();
+    });
+  }
+}
+
+$("dailyBtn").addEventListener("click", showDailyAsk);
+$("dailyBackBtn").addEventListener("click", () => { $("dailyReader").innerHTML = ""; showView("booksView"); });
+
 
 /* Text size — steps applied to the scripture body, remembered per device */
 const SIZES = [0.95, 1.05, 1.16, 1.3, 1.5, 1.75];
