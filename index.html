@@ -406,6 +406,15 @@
     animation: exspin 0.75s linear infinite;
   }
   .ex-wait-text { font-family: var(--sans); font-size: 0.85rem; font-style: normal; }
+  .ex-head-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--rubric);
+    border-radius: 50%;
+    display: inline-block;
+    animation: exspin 0.75s linear infinite;
+  }
+  .ex-head-spinner[hidden] { display: none; }
   @keyframes exspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
@@ -808,6 +817,7 @@ function mountExegesisPanel(title, withHeaderCopy, target) {
     <div class="ex-head">
       <span>${title}</span>
       <div class="ex-tools">
+        <span class="ex-head-spinner" id="exHeadSpinner" hidden></span>
         ${withHeaderCopy ? `<button class="sec-copy head-copy">&#x29C9; Copy</button>` : ""}
         <button class="ex-close" title="Close">\u2715</button>
       </div>
@@ -945,7 +955,12 @@ async function streamLens({ title, prompt, structured, target, metaOverride }) {
         try {
           const ev = JSON.parse(payload);
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
-            if (!streamStarted) { streamStarted = true; clearInterval(waitTimer); }
+            if (!streamStarted) {
+              streamStarted = true;
+              clearInterval(waitTimer);
+              const hs = panel.querySelector("#exHeadSpinner");
+              if (hs) hs.hidden = false;
+            }
             fullText += ev.delta.text;
             ctx.full = fullText;
             if (structured) {
@@ -959,8 +974,12 @@ async function streamLens({ title, prompt, structured, target, metaOverride }) {
       }
     }
     if (!fullText) body.innerHTML = `<p class="ex-status">No text was returned \u2014 try again.</p>`;
+    const hs = panel.querySelector("#exHeadSpinner");
+    if (hs) hs.hidden = true;
   } catch (err) {
     clearInterval(waitTimer);
+    const hs = panel.querySelector("#exHeadSpinner");
+    if (hs) hs.hidden = true;
     body.innerHTML = `<p class="ex-status">Couldn't reach the Anthropic API (${escapeHtml(err.message)}). Check your connection and try again.</p>`;
   }
 }
