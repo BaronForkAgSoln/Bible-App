@@ -396,16 +396,16 @@
   }
 
   /* ---------- Waiting state (before streaming begins) ---------- */
-  .ex-wait { display: flex; align-items: center; gap: 0.6rem; color: var(--muted); }
+  .ex-wait { display: flex; align-items: center; gap: 0.7rem; color: var(--muted); padding: 0.3rem 0; }
   .ex-spinner {
-    width: 15px; height: 15px;
-    border: 2px solid var(--rule);
+    width: 20px; height: 20px;
+    border: 2.5px solid var(--rule);
     border-top-color: var(--rubric);
     border-radius: 50%;
     flex: none;
-    animation: exspin 0.8s linear infinite;
+    animation: exspin 0.75s linear infinite;
   }
-  .ex-wait-text { font-family: var(--sans); font-size: 0.82rem; font-style: normal; }
+  .ex-wait-text { font-family: var(--sans); font-size: 0.85rem; font-style: normal; }
   @keyframes exspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
@@ -1046,6 +1046,8 @@ End with exactly this line:
 }
 
 /* ---------- Daily Devotional ---------- */
+const DAILY_TRANS = "ASV";  // devotional scripture always drawn from this translation
+
 function currentTransName() {
   const t = transSelect.options[transSelect.selectedIndex];
   return t ? t.text.split("\u2014")[0].trim() : "KJV";
@@ -1078,7 +1080,7 @@ function dailyDateLabel() {
 }
 
 function buildDailyPrompt(onHeart) {
-  const trans = currentTransName();
+  const trans = DAILY_TRANS;
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const heartLine = onHeart
     ? `Today the reader shared what is on their heart: "${onHeart}"\nLet this quietly shape which passage you choose and what you say \u2014 but do not repeat their words back to them or name their situation. Respond as one who already understands, not as one confirming receipt.`
@@ -1100,7 +1102,7 @@ Format the two Scripture references and any emphasis in the closing simply. Begi
 function runDailyDevotional() {
   const input = $("dailyInput");
   const onHeart = input ? input.value.trim() : "";
-  const meta = { title: `Daily Devotional \u2014 ${dailyDateLabel()}`, label: "Daily Devotional", trans: currentTransName() };
+  const meta = { title: `Daily Devotional \u2014 ${dailyDateLabel()}`, label: "Daily Devotional", trans: DAILY_TRANS };
   const ask = $("dailyAsk");
   if (ask) ask.remove();
   streamLens({
