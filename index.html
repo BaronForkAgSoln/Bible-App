@@ -306,7 +306,8 @@
   .chapter-strip button.active:active { background: var(--rubric); }
   .sel-bar button:active { background: rgba(253,253,251,0.22); transform: scale(0.97); }
   .sel-bar #exegesisBtn:active,
-  .sel-bar #reflectBtn:active { background: var(--rubric); border-color: var(--rubric); }
+  .sel-bar #reflectBtn:active,
+  .sel-bar #verseAskBtn:active { background: var(--rubric); border-color: var(--rubric); }
 
   /* Narrow phones: reference on its own line, buttons beneath, everything on screen */
   @media (max-width: 480px) {
@@ -444,6 +445,14 @@
     animation: exspin 0.75s linear infinite;
   }
   .ex-head-spinner[hidden] { display: none; }
+  .ex-totop-row { text-align: center; border-top: 1px solid var(--rule); margin-top: 1.2rem; padding-top: 1rem; }
+  .ex-totop {
+    font-family: var(--sans); font-size: 0.76rem; letter-spacing: 0.05em;
+    background: none; border: 1px solid var(--rule); border-radius: 5px;
+    padding: 0.5rem 1rem; color: var(--muted); cursor: pointer;
+  }
+  .ex-totop:hover { background: var(--hover); color: var(--ink); }
+  .ex-totop:active { background: var(--hover); color: var(--rubric); }
   @keyframes exspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
@@ -501,6 +510,7 @@
     <span class="sel-ref" id="selRef"></span>
     <button id="exegesisBtn">Exegesis</button>
     <button id="reflectBtn">Devotional</button>
+    <button id="verseAskBtn">Ask</button>
     <button id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
@@ -1005,6 +1015,16 @@ async function streamLens({ title, prompt, structured, target, metaOverride }) {
     if (!fullText) body.innerHTML = `<p class="ex-status">No text was returned \u2014 try again.</p>`;
     const hs = panel.querySelector("#exHeadSpinner");
     if (hs) hs.hidden = true;
+    // Back to Top for long answers
+    if (fullText && fullText.length > 900 && !panel.querySelector(".ex-totop")) {
+      const bt = document.createElement("div");
+      bt.className = "ex-totop-row";
+      bt.innerHTML = `<button class="ex-totop">\u2191 Back to Top</button>`;
+      body.appendChild(bt);
+      bt.querySelector(".ex-totop").addEventListener("click", () => {
+        panel.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
+    }
   } catch (err) {
     clearInterval(waitTimer);
     const hs = panel.querySelector("#exHeadSpinner");
@@ -1082,6 +1102,13 @@ $("reflectBtn").addEventListener("click", () => {
   streamLens({ title: `Devotional \u2014 ${ref}`, prompt: buildReflectionPrompt(), structured: false });
 });
 
+$("verseAskBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  const { ref, text } = selectedPassage();
+  const seed = `About ${ref} (${currentChapter.trans}): "${text}"\n\nMy question: `;
+  showAsk(seed);
+});
+
 function runChapterSummary() {
   if (!currentChapter) return;
   const prompt = `Provide a concise orientation to ${currentChapter.ref} (${currentChapter.trans}).
@@ -1151,7 +1178,7 @@ function renderRecent() {
   $("askRecentClear").addEventListener("click", () => { clearRecentQuestions(); renderRecent(); });
 }
 
-function showAsk() {
+function showAsk(seedContext) {
   const el = $("askReader");
   el.innerHTML = `
     <div class="daily-ask" id="askCard">
@@ -1172,7 +1199,12 @@ function showAsk() {
   $("askGo").addEventListener("click", runAsk);
   renderRecent();
   showView("askView");
-  setTimeout(() => input.focus(), 50);
+  if (seedContext) {
+    input.value = seedContext;
+    setTimeout(() => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; }, 0);
+    $("askRecent").style.display = "none";  // hide recents when focused on a specific verse
+  }
+  setTimeout(() => { input.focus(); const n = input.value.length; input.setSelectionRange(n, n); }, 50);
 }
 
 function buildAskPrompt(question) {
