@@ -344,7 +344,7 @@
   }
   .daily-btn:hover { background: var(--hover); }
   .daily-btn:active { background: #F5E6E6; transform: scale(0.99); }
-  #dailyReader { max-width: 44rem; }
+  #askReader { max-width: 44rem; }
   .daily-ask {
     background: #F8F5F0;
     border-left: 3px solid var(--rubric);
@@ -437,20 +437,20 @@
 
 <!-- Page 1: books -->
 <div class="view show" id="booksView">
-  <button class="daily-btn" id="dailyBtn">&#10087; Daily Devotional</button>
+  <button class="daily-btn" id="askBtn">&#10087; Ask a Bible Question</button>
   <div class="testament-label">Old Testament</div>
   <div class="book-grid" id="otGrid"></div>
   <div class="testament-label">New Testament</div>
   <div class="book-grid" id="ntGrid"></div>
 </div>
 
-<!-- Daily Devotional view -->
-<div class="view" id="dailyView">
+<!-- Ask a Bible Question view -->
+<div class="view" id="askView">
   <div class="read-top">
-    <button class="back-btn" id="dailyBackBtn">&larr; Books</button>
-    <div class="bookname">Daily Devotional</div>
+    <button class="back-btn" id="askBackBtn">&larr; Books</button>
+    <div class="bookname">Ask a Bible Question</div>
   </div>
-  <div id="dailyReader"></div>
+  <div id="askReader"></div>
 </div>
 
 <!-- Page 2: chapters + reading -->
@@ -1064,84 +1064,73 @@ End with exactly this line:
   streamLens({ title: `Chapter Summary \u2014 ${currentChapter.ref}`, prompt, structured: false });
 }
 
-/* ---------- Daily Devotional ---------- */
-const DAILY_TRANS = "ASV";  // devotional scripture always drawn from this translation
-
+/* ---------- Ask a Bible Question ---------- */
 function currentTransName() {
   const t = transSelect.options[transSelect.selectedIndex];
   return t ? t.text.split("\u2014")[0].trim() : "KJV";
 }
 
-function showDailyAsk() {
-  const el = $("dailyReader");
+function showAsk() {
+  const el = $("askReader");
   el.innerHTML = `
-    <div class="daily-ask" id="dailyAsk">
-      <div class="ask-head">Daily Devotional \u2014 ${dailyDateLabel()}</div>
-      <p class="ask-q">What is on your heart today?</p>
-      <p class="ask-sub">A word, a name, a burden \u2014 or leave it blank.</p>
+    <div class="daily-ask" id="askCard">
+      <div class="ask-head">Ask a Bible Question</div>
+      <p class="ask-q">What would you like to ask?</p>
+      <p class="ask-sub">Anything about Scripture \u2014 a passage, a person, a word, a theme, a difference between traditions.</p>
       <div class="ask-row">
-        <textarea id="dailyInput" rows="1" placeholder="Optional"></textarea>
-        <button class="ask-begin" id="dailyBegin">Begin</button>
+        <textarea id="askInput" rows="1" placeholder="e.g. Who were the Nephilim? \u00B7 What does 'selah' mean? \u00B7 Why do some Bibles have more books?"></textarea>
+        <button class="ask-begin" id="askGo">Ask</button>
       </div>
     </div>`;
-  const input = $("dailyInput");
+  const input = $("askInput");
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runDailyDevotional(); }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runAsk(); }
   });
-  $("dailyBegin").addEventListener("click", runDailyDevotional);
-  showView("dailyView");
+  $("askGo").addEventListener("click", runAsk);
+  showView("askView");
   setTimeout(() => input.focus(), 50);
 }
 
-function dailyDateLabel() {
-  return new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" });
+function buildAskPrompt(question) {
+  const trans = currentTransName();
+  return `A reader of a Bible study app has asked this question:
+
+"${question}"
+
+Answer it clearly and helpfully, as a knowledgeable, trustworthy Bible teacher would. Guidelines:
+- Ground the answer in Scripture; cite specific references, and quote briefly from the ${trans} translation where a quotation helps.
+- Keep it focused and readable \u2014 usually a few short paragraphs. Match the depth to the question: a simple factual question gets a concise answer; a weighty one gets more care.
+- On matters where sincere Christians and major traditions genuinely differ (for example baptism, predestination, end-times, church government, the age of creation), do not present one tradition's view as the settled answer. Briefly lay out what the main positions hold and the scriptural reasoning behind them, and let the reader weigh it. Where the text holds tension, hold it rather than resolving it into a formula.
+- If the question is outside the scope of the Bible, Christian faith, and church history, gently say it's outside what this tool is for.
+- Warm, plain, respectful. No headers or section labels unless the answer genuinely needs a short list. Do not open with filler like "Great question."`;
 }
 
-function buildDailyPrompt(onHeart) {
-  const trans = DAILY_TRANS;
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-  const heartLine = onHeart
-    ? `Today the reader shared what is on their heart: "${onHeart}"\nLet this quietly shape which passage you choose and what you say \u2014 but do not repeat their words back to them or name their situation. Respond as one who already understands, not as one confirming receipt.`
-    : `The reader did not share anything specific today. Choose a passage well-suited to an ordinary day \u2014 you may let the day of the week or season (today is ${today}) gently inform the choice \u2014 and vary your choice from what a predictable pick would be.`;
-  return `Write a short daily devotional in the ${trans} translation.
-
-${heartLine}
-
-Structure \u2014 follow it exactly:
-1. Open directly with Scripture. No introductory sentence, no greeting, no framing before it. Quote one passage, or two short passages that speak to one another, each followed by its reference on its own line. Use the ${trans} wording.
-2. Then a few plain words \u2014 three to five sentences \u2014 drawing the passage toward the reader's day. Not exposition, not a lecture; a wise friend's gentle gloss. Never clever or aphoristic for its own sake.
-3. Close with one or two sentences of blessing \u2014 a word to carry \u2014 in its own voice, with no label or heading over it.
-
-Voice: warm, plain, unhurried. Let Scripture do the heavy work; keep your own words few. No headers, no "Key Takeaway," no "Word of Wisdom," no section labels anywhere. If what the reader shared is heavy, meet it with steadiness and Scripture and point them toward God and the people in their life \u2014 never offer medical assurance or act as a counselor.
-
-Format the two Scripture references and any emphasis in the closing simply. Begin now with the Scripture.`;
-}
-
-function runDailyDevotional() {
-  const input = $("dailyInput");
-  const onHeart = input ? input.value.trim() : "";
-  const meta = { title: `Daily Devotional \u2014 ${dailyDateLabel()}`, label: "Daily Devotional", trans: DAILY_TRANS };
-  const ask = $("dailyAsk");
-  if (ask) ask.remove();
+function runAsk() {
+  const input = $("askInput");
+  const question = input ? input.value.trim() : "";
+  if (!question) { if (input) input.focus(); return; }
+  const meta = { title: "Ask a Bible Question", label: "Q&A", trans: currentTransName() };
+  const card = $("askCard");
+  if (card) card.remove();
   streamLens({
-    title: `Daily Devotional \u2014 ${dailyDateLabel()}`,
-    prompt: buildDailyPrompt(onHeart),
+    title: "Ask a Bible Question",
+    prompt: buildAskPrompt(question),
     structured: false,
-    target: $("dailyReader"),
+    target: $("askReader"),
     metaOverride: meta
   });
-  // When this devotional's panel is closed, return to the question screen
+  // When the answer panel is closed, return to the question screen
   const panel = document.getElementById("exegesisPanel");
   if (panel) {
     panel.querySelector(".ex-close").addEventListener("click", () => {
-      if ($("dailyView").classList.contains("show")) showDailyAsk();
+      if ($("askView").classList.contains("show")) showAsk();
     });
   }
 }
 
-$("dailyBtn").addEventListener("click", showDailyAsk);
-$("dailyBackBtn").addEventListener("click", () => { $("dailyReader").innerHTML = ""; showView("booksView"); });
+$("askBtn").addEventListener("click", showAsk);
+$("askBackBtn").addEventListener("click", () => { $("askReader").innerHTML = ""; showView("booksView"); });
 
 
 /* Text size — steps applied to the scripture body, remembered per device */
