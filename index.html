@@ -408,14 +408,21 @@
   }
   .ask-recent-clear:hover { color: var(--rubric); }
   .ask-recent-item {
-    display: block; width: 100%; text-align: left;
+    display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left;
     font-family: var(--serif); font-size: 0.92rem; color: var(--ink);
     background: none; border: none; border-top: 1px solid var(--rule);
     padding: 0.55rem 0.2rem; cursor: pointer;
   }
   .ask-recent-item:last-child { border-bottom: 1px solid var(--rule); }
   .ask-recent-item:hover { color: var(--rubric); }
-  .ask-recent-item::before { content: "\21A9"; color: var(--muted); margin-right: 0.5rem; font-size: 0.85em; }
+  .ask-recent-item .ari-icon { color: var(--muted); font-size: 0.85em; flex: none; }
+  .ask-recent-item .ari-text { flex: 1; }
+  .ask-recent-del {
+    flex: none; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 0.95rem; line-height: 1;
+    padding: 0.2rem 0.4rem; border-radius: 4px;
+  }
+  .ask-recent-del:hover { color: var(--rubric); background: var(--hover); }
 
   /* ---------- Waiting state (before streaming begins) ---------- */
   .ex-wait { display: flex; align-items: center; gap: 0.7rem; color: var(--muted); padding: 0.3rem 0; }
@@ -1101,6 +1108,10 @@ function saveRecentQuestion(q) {
 function clearRecentQuestions() {
   try { localStorage.removeItem("bible.recentQuestions"); } catch (e) {}
 }
+function removeRecentQuestion(q) {
+  const list = getRecentQuestions().filter(x => x !== q);
+  try { localStorage.setItem("bible.recentQuestions", JSON.stringify(list)); } catch (e) {}
+}
 
 function currentTransName() {
   const t = transSelect.options[transSelect.selectedIndex];
@@ -1113,14 +1124,28 @@ function renderRecent() {
   const list = getRecentQuestions();
   if (!list.length) { wrap.innerHTML = ""; return; }
   wrap.innerHTML =
-    `<div class="ask-recent-head"><span>Recent</span><button class="ask-recent-clear" id="askRecentClear">Clear</button></div>` +
-    list.map(q => `<button class="ask-recent-item">${escapeHtml(q)}</button>`).join("");
-  wrap.querySelectorAll(".ask-recent-item").forEach((b, i) => {
-    b.addEventListener("click", () => {
+    `<div class="ask-recent-head"><span>Recent</span><button class="ask-recent-clear" id="askRecentClear">Clear all</button></div>` +
+    list.map(q => `<div class="ask-recent-item" data-q="${escapeHtml(q)}">` +
+      `<span class="ari-icon">\u21A9</span>` +
+      `<span class="ari-text">${escapeHtml(q)}</span>` +
+      `<button class="ask-recent-del" title="Remove">\u2715</button></div>`).join("");
+  wrap.querySelectorAll(".ask-recent-item").forEach((row, i) => {
+    row.querySelector(".ari-text").addEventListener("click", () => {
       const input = $("askInput");
       input.value = list[i];
       input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
       input.focus();
+    });
+    row.querySelector(".ari-icon").addEventListener("click", () => {
+      const input = $("askInput");
+      input.value = list[i];
+      input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
+      input.focus();
+    });
+    row.querySelector(".ask-recent-del").addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeRecentQuestion(list[i]);
+      renderRecent();
     });
   });
   $("askRecentClear").addEventListener("click", () => { clearRecentQuestions(); renderRecent(); });
