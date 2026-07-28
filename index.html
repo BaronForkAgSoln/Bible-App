@@ -453,6 +453,48 @@
   }
   .ex-totop:hover { background: var(--hover); color: var(--ink); }
   .ex-totop:active { background: var(--hover); color: var(--rubric); }
+
+  /* ---------- Read Aloud (TTS) ---------- */
+  .scripture .reading { background: #F5E6E6; box-shadow: 0 0 0 2px #F5E6E6; border-radius: 2px; }
+  .read-btn {
+    font-family: var(--sans); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.05em;
+    background: none; border: 1px solid var(--rule); border-radius: 4px;
+    padding: 0.45rem 0.8rem; color: var(--ink); cursor: pointer; white-space: nowrap;
+  }
+  .read-btn:hover { background: var(--hover); }
+  .read-btn:active { background: var(--hover); color: var(--rubric); }
+  .read-btn.tts-on { background: var(--rubric); border-color: var(--rubric); color: var(--paper); }
+  .ex-speak {
+    flex: none; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 0.95rem; line-height: 1; padding: 0.2rem 0.4rem; border-radius: 4px;
+  }
+  .ex-speak:hover { color: var(--ink); background: var(--hover); }
+  .ex-speak.tts-on { color: var(--rubric); }
+  .voice-row {
+    display: flex; align-items: center; gap: 0.5rem; margin-top: 1.2rem;
+    font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .voice-row select { max-width: 14rem; }
+  .voice-overlay {
+    position: fixed; inset: 0; background: rgba(28,27,26,0.35);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .voice-panel {
+    background: var(--paper); border-radius: 10px; padding: 1.3rem 1.4rem;
+    max-width: 90vw; width: 22rem; box-shadow: 0 8px 30px rgba(28,27,26,0.3);
+  }
+  .voice-panel-head {
+    font-family: var(--sans); font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--rubric); margin-bottom: 0.8rem;
+  }
+  .voice-panel select {
+    width: 100%; font-family: var(--sans); font-size: 0.85rem; color: var(--ink);
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 0.5rem;
+  }
+  .voice-panel-row { display: flex; gap: 8px; margin-top: 0.9rem; }
+  .voice-panel-row .read-btn { flex: 1; text-align: center; }
+  .voice-hint { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); margin-top: 0.9rem; line-height: 1.5; }
   @keyframes exspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
@@ -501,6 +543,7 @@
       <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
       <button class="back-btn" id="emailBtn" title="Email this chapter">&#9993; Email</button>
       <button class="back-btn" id="emailEditBtn" title="Change email address">&#9998;</button>
+      <button class="back-btn" id="voiceBtn" title="Reading voice">&#127908;</button>
       <button class="back-btn" id="keyBtn" title="Anthropic API key for exegesis">&#128273;</button>
     </div>
   </div>
@@ -511,6 +554,7 @@
     <button id="exegesisBtn">Exegesis</button>
     <button id="reflectBtn">Devotional</button>
     <button id="verseAskBtn">Ask</button>
+    <button id="verseReadBtn">&#128266;</button>
     <button id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
@@ -671,6 +715,7 @@ function openBook(code) {
 
 /* ---------- Chapter loading (two sources) ---------- */
 async function loadChapter(code, chapter) {
+  ttsStop();
   const [, name, chapterCount] = ALL.find(b => b[0] === code);
   state.book = code;
   state.chapter = chapter;
@@ -684,6 +729,7 @@ async function loadChapter(code, chapter) {
     <div class="passage-head">
       <span class="chapnum">${chapter}</span>
       <div class="transname">${transName}</div>
+      <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud">&#128266; Read</button>
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
     </div>`;
   const pager = `
@@ -730,6 +776,18 @@ async function loadChapter(code, chapter) {
     if (chapter > 1) $("prevCh").addEventListener("click", () => loadChapter(code, chapter - 1));
     if (chapter < chapterCount) $("nextCh").addEventListener("click", () => loadChapter(code, chapter + 1));
     $("summaryBtn").addEventListener("click", runChapterSummary);
+    const readCh = $("readChapterBtn");
+    if (readCh && TTS.supported) {
+      readCh.addEventListener("click", () => {
+        const spans = Array.from(document.querySelectorAll("#reader .scripture .verse"));
+        const chunks = chapterVerses ? chapterVerses.map(v => v.text)
+          : spans.map(s => s.textContent.replace(/^\d+\s*/, ""));
+        const els = spans.length ? spans : null;
+        ttsToggle(readCh, chunks, els);
+      });
+    } else if (readCh) {
+      readCh.style.display = "none";
+    }
     reportFums(fumsToken);
   } catch (err) {
     reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
@@ -793,6 +851,110 @@ function showToast(msg, ms = 3000) {
   t._timer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
+/* ---------- Text-to-Speech (Read Aloud) ---------- */
+const TTS = {
+  voices: [],
+  supported: ("speechSynthesis" in window),
+  current: null,      // the utterance-owning control element id, for toggling
+};
+
+function ttsLoadVoices() {
+  if (!TTS.supported) return;
+  let vs = speechSynthesis.getVoices();
+  let eng = vs.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
+  TTS.voices = eng.length ? eng : vs;
+}
+if (TTS.supported) {
+  ttsLoadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = ttsLoadVoices;
+}
+
+function ttsSavedVoiceName() {
+  try { return localStorage.getItem("bible.voice") || ""; } catch (e) { return ""; }
+}
+function ttsSaveVoiceName(n) {
+  try { localStorage.setItem("bible.voice", n); } catch (e) {}
+}
+function ttsPickVoice() {
+  const saved = ttsSavedVoiceName();
+  if (saved) {
+    const v = TTS.voices.find(v => v.name === saved);
+    if (v) return v;
+  }
+  // default to a British voice if present, else first
+  const brit = TTS.voices.find(v => (v.lang || "").toLowerCase().includes("gb"));
+  return brit || TTS.voices[0] || null;
+}
+
+function ttsRegionLabel(v) {
+  const l = (v.lang || "").toLowerCase();
+  if (l.includes("gb")) return " \u2014 British";
+  if (l.includes("us")) return " \u2014 American";
+  if (l.includes("au")) return " \u2014 Australian";
+  if (l.includes("ie")) return " \u2014 Irish";
+  if (l.includes("za")) return " \u2014 S. African";
+  if (l.includes("in")) return " \u2014 Indian";
+  return "";
+}
+
+/* Speak an array of text chunks in sequence, invoking onChunk(index) as each starts.
+   Returns a controller with stop(). */
+function ttsSpeak(chunks, onChunk, onDone) {
+  speechSynthesis.cancel();
+  const voice = ttsPickVoice();
+  let i = 0, stopped = false;
+  function next() {
+    if (stopped || i >= chunks.length) { if (onChunk) onChunk(-1); if (onDone && !stopped) onDone(); return; }
+    if (onChunk) onChunk(i);
+    const u = new SpeechSynthesisUtterance(chunks[i]);
+    if (voice) u.voice = voice;
+    u.rate = 0.95;
+    u.onend = () => { i++; next(); };
+    u.onerror = () => { i++; next(); };
+    speechSynthesis.speak(u);
+  }
+  next();
+  return { stop: () => { stopped = true; speechSynthesis.cancel(); if (onChunk) onChunk(-1); } };
+}
+
+let ttsController = null;
+function ttsStop() {
+  if (ttsController) { ttsController.stop(); ttsController = null; }
+  document.querySelectorAll(".reading").forEach(e => e.classList.remove("reading"));
+  document.querySelectorAll(".tts-on").forEach(e => e.classList.remove("tts-on"));
+}
+
+/* Toggle reading for a labeled button: if this control is playing, stop; else start. */
+function ttsToggle(btnEl, chunks, highlightEls) {
+  if (btnEl.classList.contains("tts-on")) { ttsStop(); return; }
+  ttsStop();
+  btnEl.classList.add("tts-on");
+  ttsController = ttsSpeak(
+    chunks,
+    (idx) => {
+      document.querySelectorAll(".reading").forEach(e => e.classList.remove("reading"));
+      if (idx >= 0 && highlightEls && highlightEls[idx]) {
+        highlightEls[idx].classList.add("reading");
+        highlightEls[idx].scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    },
+    () => { btnEl.classList.remove("tts-on"); ttsController = null; }
+  );
+}
+
+/* Build a voice-picker option list into a <select> */
+function ttsFillVoiceSelect(sel) {
+  sel.innerHTML = "";
+  TTS.voices.forEach((v) => {
+    const o = document.createElement("option");
+    o.value = v.name;
+    o.textContent = v.name + ttsRegionLabel(v);
+    sel.appendChild(o);
+  });
+  const chosen = ttsPickVoice();
+  if (chosen) sel.value = chosen.name;
+}
+
 /* ---------- Anthropic API key (yours, stored only in this browser) ---------- */
 function getApiKey() {
   try { return localStorage.getItem("bible.anthropicKey") || ""; } catch (e) { return ""; }
@@ -810,6 +972,38 @@ function ensureApiKey() {
   }
   return k;
 }
+$("voiceBtn").addEventListener("click", () => {
+  if (!TTS.supported) { showToast("Read Aloud isn't available in this browser"); return; }
+  ttsLoadVoices();
+  if (!TTS.voices.length) { showToast("No voices available yet \u2014 try again in a moment"); return; }
+  const existing = document.getElementById("voiceOverlay");
+  if (existing) { existing.remove(); return; }
+  const ov = document.createElement("div");
+  ov.id = "voiceOverlay";
+  ov.className = "voice-overlay";
+  ov.innerHTML = `
+    <div class="voice-panel">
+      <div class="voice-panel-head">Reading voice</div>
+      <select id="voicePick"></select>
+      <div class="voice-panel-row">
+        <button class="read-btn" id="voicePreview">&#128266; Preview</button>
+        <button class="read-btn" id="voiceDone">Done</button>
+      </div>
+      <p class="voice-hint">For richer voices, download an "enhanced" English voice in your device's accessibility settings.</p>
+    </div>`;
+  document.body.appendChild(ov);
+  const sel = document.getElementById("voicePick");
+  ttsFillVoiceSelect(sel);
+  sel.addEventListener("change", () => ttsSaveVoiceName(sel.value));
+  document.getElementById("voicePreview").addEventListener("click", () => {
+    ttsSaveVoiceName(sel.value);
+    ttsStop();
+    ttsController = ttsSpeak(["For God so loved the world."], null, () => { ttsController = null; });
+  });
+  document.getElementById("voiceDone").addEventListener("click", () => { ttsSaveVoiceName(sel.value); ttsStop(); ov.remove(); });
+  ov.addEventListener("click", (e) => { if (e.target === ov) { ttsStop(); ov.remove(); } });
+});
+
 $("keyBtn").addEventListener("click", () => {
   const entry = window.prompt(
     "Anthropic API key for exegesis:\n(Clear the box and press OK to remove it from this device.)",
@@ -857,12 +1051,13 @@ function mountExegesisPanel(title, withHeaderCopy, target) {
       <span>${title}</span>
       <div class="ex-tools">
         <span class="ex-head-spinner" id="exHeadSpinner" hidden></span>
+        <button class="ex-speak" id="exSpeak" title="Read aloud" hidden>&#128266;</button>
         ${withHeaderCopy ? `<button class="sec-copy head-copy">&#x29C9; Copy</button>` : ""}
         <button class="ex-close" title="Close">\u2715</button>
       </div>
     </div>
     <div class="ex-body"><p class="ex-status">Preparing\u2026</p></div>`;
-  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  panel.querySelector(".ex-close").addEventListener("click", () => { ttsStop(); panel.remove(); });
   const reader = target || $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
@@ -1015,6 +1210,19 @@ async function streamLens({ title, prompt, structured, target, metaOverride }) {
     if (!fullText) body.innerHTML = `<p class="ex-status">No text was returned \u2014 try again.</p>`;
     const hs = panel.querySelector("#exHeadSpinner");
     if (hs) hs.hidden = true;
+    // Read Aloud for the finished answer
+    const spk = panel.querySelector("#exSpeak");
+    if (spk && fullText && TTS.supported) {
+      spk.hidden = false;
+      spk.addEventListener("click", () => {
+        if (spk.classList.contains("tts-on")) { ttsStop(); return; }
+        ttsStop();
+        spk.classList.add("tts-on");
+        const readable = fullText.replace(/[#*]/g, "");
+        const chunks = readable.split(/\n\s*\n/).map(s => s.replace(/\s+/g, " ").trim()).filter(Boolean);
+        ttsController = ttsSpeak(chunks, null, () => { spk.classList.remove("tts-on"); ttsController = null; });
+      });
+    }
     // Back to Top for long answers
     if (fullText && fullText.length > 900 && !panel.querySelector(".ex-totop")) {
       const bt = document.createElement("div");
@@ -1107,6 +1315,17 @@ $("verseAskBtn").addEventListener("click", () => {
   const { ref, text } = selectedPassage();
   const seed = `About ${ref} (${currentChapter.trans}): "${text}"\n\nMy question: `;
   showAsk(seed);
+});
+
+$("verseReadBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  const btn = $("verseReadBtn");
+  if (!TTS.supported) return;
+  const [a, b] = selRange();
+  const verses = chapterVerses.filter(v => v.n >= a && v.n <= b);
+  const chunks = verses.map(v => v.text);
+  const els = verses.map(v => document.querySelector(`#reader .verse[data-v="${v.n}"]`)).filter(Boolean);
+  ttsToggle(btn, chunks, els.length ? els : null);
 });
 
 function runChapterSummary() {
@@ -1303,6 +1522,7 @@ $("emailEditBtn").addEventListener("click", () => {
 });
 
 $("backBtn").addEventListener("click", () => {
+  ttsStop();
   state.book = null;
   state.chapter = null;
   selectedVerses.clear();
