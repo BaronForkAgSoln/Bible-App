@@ -852,6 +852,7 @@ function showToast(msg, ms = 3000) {
 }
 
 /* ---------- Text-to-Speech (Read Aloud) ---------- */
+const TTS_RATE = 0.85;  // reading speed; 1.0 is normal, lower is slower
 const TTS = {
   voices: [],
   supported: ("speechSynthesis" in window),
@@ -908,7 +909,7 @@ function ttsSpeak(chunks, onChunk, onDone) {
     if (onChunk) onChunk(i);
     const u = new SpeechSynthesisUtterance(chunks[i]);
     if (voice) u.voice = voice;
-    u.rate = 0.95;
+    u.rate = TTS_RATE;
     u.onend = () => { i++; next(); };
     u.onerror = () => { i++; next(); };
     speechSynthesis.speak(u);
@@ -1418,7 +1419,7 @@ function showAsk(seedContext) {
   $("askGo").addEventListener("click", runAsk);
   renderRecent();
   showView("askView");
-  if (seedContext) {
+  if (seedContext && typeof seedContext === "string") {
     input.value = seedContext;
     setTimeout(() => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; }, 0);
     $("askRecent").style.display = "none";  // hide recents when focused on a specific verse
