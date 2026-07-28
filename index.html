@@ -394,6 +394,28 @@
     .daily-ask .ask-row { flex-direction: column; }
     .daily-ask .ask-begin { padding: 10px; }
   }
+  .ask-recent { margin-top: 14px; }
+  .ask-recent-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-family: var(--sans); font-size: 0.66rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .ask-recent-clear {
+    font-family: var(--sans); font-size: 0.66rem; letter-spacing: 0.04em;
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    text-transform: none; padding: 2px 4px;
+  }
+  .ask-recent-clear:hover { color: var(--rubric); }
+  .ask-recent-item {
+    display: block; width: 100%; text-align: left;
+    font-family: var(--serif); font-size: 0.92rem; color: var(--ink);
+    background: none; border: none; border-top: 1px solid var(--rule);
+    padding: 0.55rem 0.2rem; cursor: pointer;
+  }
+  .ask-recent-item:last-child { border-bottom: 1px solid var(--rule); }
+  .ask-recent-item:hover { color: var(--rubric); }
+  .ask-recent-item::before { content: "\21A9"; color: var(--muted); margin-right: 0.5rem; font-size: 0.85em; }
 
   /* ---------- Waiting state (before streaming begins) ---------- */
   .ex-wait { display: flex; align-items: center; gap: 0.7rem; color: var(--muted); padding: 0.3rem 0; }
@@ -1065,9 +1087,43 @@ End with exactly this line:
 }
 
 /* ---------- Ask a Bible Question ---------- */
+const ASK_RECENT_MAX = 3;
+
+function getRecentQuestions() {
+  try { return JSON.parse(localStorage.getItem("bible.recentQuestions") || "[]"); } catch (e) { return []; }
+}
+function saveRecentQuestion(q) {
+  let list = getRecentQuestions().filter(x => x.toLowerCase() !== q.toLowerCase());
+  list.unshift(q);
+  list = list.slice(0, ASK_RECENT_MAX);
+  try { localStorage.setItem("bible.recentQuestions", JSON.stringify(list)); } catch (e) {}
+}
+function clearRecentQuestions() {
+  try { localStorage.removeItem("bible.recentQuestions"); } catch (e) {}
+}
+
 function currentTransName() {
   const t = transSelect.options[transSelect.selectedIndex];
   return t ? t.text.split("\u2014")[0].trim() : "KJV";
+}
+
+function renderRecent() {
+  const wrap = $("askRecent");
+  if (!wrap) return;
+  const list = getRecentQuestions();
+  if (!list.length) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML =
+    `<div class="ask-recent-head"><span>Recent</span><button class="ask-recent-clear" id="askRecentClear">Clear</button></div>` +
+    list.map(q => `<button class="ask-recent-item">${escapeHtml(q)}</button>`).join("");
+  wrap.querySelectorAll(".ask-recent-item").forEach((b, i) => {
+    b.addEventListener("click", () => {
+      const input = $("askInput");
+      input.value = list[i];
+      input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
+      input.focus();
+    });
+  });
+  $("askRecentClear").addEventListener("click", () => { clearRecentQuestions(); renderRecent(); });
 }
 
 function showAsk() {
@@ -1081,6 +1137,7 @@ function showAsk() {
         <textarea id="askInput" rows="1" placeholder=""></textarea>
         <button class="ask-begin" id="askGo">Ask</button>
       </div>
+      <div class="ask-recent" id="askRecent"></div>
     </div>`;
   const input = $("askInput");
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
@@ -1088,6 +1145,7 @@ function showAsk() {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runAsk(); }
   });
   $("askGo").addEventListener("click", runAsk);
+  renderRecent();
   showView("askView");
   setTimeout(() => input.focus(), 50);
 }
@@ -1102,14 +1160,16 @@ Answer it clearly and helpfully, as a knowledgeable, trustworthy Bible teacher w
 - Ground the answer in Scripture; cite specific references, and quote briefly from the ${trans} translation where a quotation helps.
 - Keep it focused and readable \u2014 usually a few short paragraphs. Match the depth to the question: a simple factual question gets a concise answer; a weighty one gets more care.
 - On matters where sincere Christians and major traditions genuinely differ (for example baptism, predestination, end-times, church government, the age of creation), do not present one tradition's view as the settled answer. Briefly lay out what the main positions hold and the scriptural reasoning behind them, and let the reader weigh it. Where the text holds tension, hold it rather than resolving it into a formula.
-- If the question is outside the scope of the Bible, Christian faith, and church history, gently say it's outside what this tool is for.
-- Warm, plain, respectful. No headers or section labels unless the answer genuinely needs a short list. Do not open with filler like "Great question."`;
+- Warm, plain, respectful. No headers or section labels unless the answer genuinely needs a short list. Do not open with filler like "Great question."
+
+Scope \u2014 important: This tool is for understanding the Bible and the Christian faith. Answer freely when a question serves that understanding \u2014 this includes Scripture itself, theology, church history, and the historical, cultural, linguistic, and archaeological background that illuminates the text (Roman and Ancient Near Eastern history, biblical languages, customs, geography, and the like). But if a question does not serve the understanding of the Bible and Christianity \u2014 a general-knowledge question, a request for help with an unrelated task, current events, and so on \u2014 do not answer it. Instead, warmly and briefly say that this tool is for questions about the Bible and the Christian faith, and invite a question of that kind. Do not answer the off-topic question even partially.`;
 }
 
 function runAsk() {
   const input = $("askInput");
   const question = input ? input.value.trim() : "";
   if (!question) { if (input) input.focus(); return; }
+  saveRecentQuestion(question);
   const meta = { title: "Ask a Bible Question", label: "Q&A", trans: currentTransName() };
   const card = $("askCard");
   if (card) card.remove();
