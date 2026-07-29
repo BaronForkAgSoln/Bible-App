@@ -126,12 +126,14 @@
 
   .welcome { color: var(--muted); font-size: 1.05rem; font-style: italic; margin-top: 1rem; }
 
-  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 0.7rem; }
+  .passage-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 0.7rem; }
   .passage-head .chapnum { font-size: 3.2rem; line-height: 1; color: var(--rubric); }
   .passage-head .transname {
     font-family: var(--sans); font-size: 0.68rem; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--muted);
   }
+  .passage-title { display: flex; flex-direction: column; gap: 0.15rem; }
+  .passage-title .bookref { font-family: var(--serif); font-size: 1.35rem; font-weight: 500; color: var(--ink); line-height: 1.1; }
   .chapter-controls {
     display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
     padding-bottom: 1.1rem; margin-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
@@ -591,6 +593,7 @@
       <button class="gear-btn" id="settingsBtn" title="Settings" aria-haspopup="true">&#9881;</button>
       <div class="settings-menu" id="settingsMenu" hidden>
         <div class="settings-menu-head">Settings</div>
+        <button class="settings-item" id="voiceBtn">&#127908;&nbsp; Reading voice</button>
         <button class="settings-item" id="keyBtn">&#128273;&nbsp; API key</button>
         <button class="settings-item" id="emailEditBtn">&#9998;&nbsp; Default email address</button>
       </div>
@@ -624,7 +627,6 @@
     <div class="read-tools">
       <button class="back-btn" id="sizeDown" title="Smaller text">A&minus;</button>
       <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
-      <button class="back-btn" id="voiceBtn" title="Reading voice">&#127908;</button>
     </div>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
@@ -808,7 +810,10 @@ async function loadChapter(code, chapter, keepReading) {
   const head = `
     <div class="passage-head">
       <span class="chapnum">${chapter}</span>
-      <div class="transname">${transName}</div>
+      <div class="passage-title">
+        <div class="bookref">${name} ${chapter}</div>
+        <div class="transname">${transName}</div>
+      </div>
     </div>
     <div class="chapter-controls">
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
@@ -1255,7 +1260,7 @@ document.addEventListener("click", (e) => {
   if (menu && !menu.hidden && !e.target.closest(".settings-wrap")) menu.hidden = true;
 });
 // Close the menu after choosing any item
-["emailEditBtn", "keyBtn"].forEach(id => {
+["voiceBtn", "emailEditBtn", "keyBtn"].forEach(id => {
   const b = $(id);
   if (b) b.addEventListener("click", () => { const m = $("settingsMenu"); if (m) m.hidden = true; });
 });
