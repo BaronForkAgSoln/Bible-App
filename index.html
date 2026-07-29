@@ -495,6 +495,42 @@
   .voice-panel-row { display: flex; gap: 8px; margin-top: 0.9rem; }
   .voice-panel-row .read-btn { flex: 1; text-align: center; }
   .voice-hint { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); margin-top: 0.9rem; line-height: 1.5; }
+
+  /* ---------- Listening mode (continuous reading) ---------- */
+  .listen-bar {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    width: min(94vw, 30rem);
+    background: #F8F5F0; border-left: 3px solid var(--rubric);
+    border-radius: 10px; box-shadow: 0 6px 24px rgba(28,27,26,0.22);
+    padding: 1rem 1.1rem 1.1rem; z-index: 40; text-align: center;
+  }
+  .listen-status { margin-bottom: 0.7rem; }
+  .listen-status .ls-now {
+    display: block; font-family: var(--sans); font-size: 0.62rem;
+    font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rubric);
+  }
+  .listen-status .ls-ref { font-family: var(--serif); font-size: 1.25rem; color: var(--ink); }
+  .listen-controls { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.8rem; }
+  .listen-play {
+    width: 64px; height: 64px; border-radius: 50%; border: none;
+    background: var(--rubric); color: var(--paper); font-size: 1.5rem; cursor: pointer; flex: none;
+  }
+  .listen-play:active { background: #762727; }
+  .listen-skip {
+    width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid var(--rule);
+    background: none; color: var(--ink); font-size: 1.1rem; cursor: pointer; flex: none;
+  }
+  .listen-skip:active { background: var(--hover); }
+  .listen-opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .listen-opt {
+    font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.03em;
+    background: none; border: 1px solid var(--rule); border-radius: 14px;
+    padding: 0.35rem 0.8rem; color: var(--muted); cursor: pointer;
+  }
+  .listen-opt:active { background: var(--hover); }
+  .listen-opt.on { background: var(--rubric); border-color: var(--rubric); color: var(--paper); }
+  .listen-opt.listen-end { color: var(--rubric); border-color: #E7C9C9; }
   @keyframes exspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .ex-wait-text { animation: exbreathe 2s ease-in-out infinite; }
@@ -714,8 +750,8 @@ function openBook(code) {
 }
 
 /* ---------- Chapter loading (two sources) ---------- */
-async function loadChapter(code, chapter) {
-  ttsStop();
+async function loadChapter(code, chapter, keepReading) {
+  if (!keepReading) ttsStop();
   const [, name, chapterCount] = ALL.find(b => b[0] === code);
   state.book = code;
   state.chapter = chapter;
@@ -730,6 +766,7 @@ async function loadChapter(code, chapter) {
       <span class="chapnum">${chapter}</span>
       <div class="transname">${transName}</div>
       <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud">&#128266; Read</button>
+      <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter">&#9193; Read continuously</button>
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
     </div>`;
   const pager = `
@@ -788,6 +825,12 @@ async function loadChapter(code, chapter) {
     } else if (readCh) {
       readCh.style.display = "none";
     }
+    const readCont = $("readContinuousBtn");
+    if (readCont && TTS.supported) {
+      readCont.addEventListener("click", startContinuous);
+    } else if (readCont) {
+      readCont.style.display = "none";
+    }
     reportFums(fumsToken);
   } catch (err) {
     reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
@@ -801,6 +844,44 @@ function splitSel(v) {
 }
 function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* ---------- Continuous reading (auto-advance) + wake lock ---------- */
+let continuousMode = false;
+let wakeLock = null;
+let sleepTimer = null;
+let stopAfterChapter = false;
+
+async function acquireWakeLock() {
+  try {
+    if ("wakeLock" in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  } catch (e) { /* wake lock unavailable; reading still works while screen is on */ }
+}
+function releaseWakeLock() {
+  try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
+}
+// Re-acquire wake lock if the page returns to foreground during continuous reading
+document.addEventListener("visibilitychange", () => {
+  if (continuousMode && document.visibilityState === "visible") acquireWakeLock();
+});
+
+function nextChapterOf(code, chapter) {
+  const idx = ALL.findIndex(b => b[0] === code);
+  if (idx < 0) return null;
+  const [, , count] = ALL[idx];
+  if (chapter < count) return { code, chapter: chapter + 1 };
+  if (idx + 1 < ALL.length) return { code: ALL[idx + 1][0], chapter: 1 };
+  return null; // end of Revelation
+}
+function prevChapterOf(code, chapter) {
+  const idx = ALL.findIndex(b => b[0] === code);
+  if (idx < 0) return null;
+  if (chapter > 1) return { code, chapter: chapter - 1 };
+  if (idx - 1 >= 0) { const p = ALL[idx - 1]; return { code: p[0], chapter: p[2] }; }
+  return null; // before Genesis 1
 }
 
 /* ---------- Events ---------- */
@@ -928,6 +1009,7 @@ function ttsStop() {
 /* Toggle reading for a labeled button: if this control is playing, stop; else start. */
 function ttsToggle(btnEl, chunks, highlightEls) {
   if (btnEl.classList.contains("tts-on")) { ttsStop(); return; }
+  if (continuousMode) stopContinuous();
   ttsStop();
   btnEl.classList.add("tts-on");
   ttsController = ttsSpeak(
@@ -954,6 +1036,147 @@ function ttsFillVoiceSelect(sel) {
   });
   const chosen = ttsPickVoice();
   if (chosen) sel.value = chosen.name;
+}
+
+/* ---------- Continuous reading engine + listening mode ---------- */
+function chapterChunksForReading() {
+  const spans = Array.from(document.querySelectorAll("#reader .scripture .verse"));
+  const chunks = chapterVerses ? chapterVerses.map(v => v.text)
+    : spans.map(s => s.textContent.replace(/^\d+\s*/, ""));
+  return { chunks, spans };
+}
+
+function startContinuous() {
+  if (!TTS.supported || !currentChapter) return;
+  continuousMode = true;
+  stopAfterChapter = false;
+  acquireWakeLock();
+  buildListenBar();
+  readCurrentThenAdvance();
+}
+
+function readCurrentThenAdvance() {
+  const { chunks, spans } = chapterChunksForReading();
+  updateListenBar();
+  ttsController = ttsSpeak(
+    chunks,
+    (idx) => {
+      document.querySelectorAll(".reading").forEach(e => e.classList.remove("reading"));
+      if (idx >= 0 && spans[idx]) { spans[idx].classList.add("reading"); spans[idx].scrollIntoView({ block: "center", behavior: "smooth" }); }
+    },
+    () => {
+      // chapter finished
+      if (!continuousMode) return;
+      if (stopAfterChapter) { stopContinuous(); return; }
+      const nxt = nextChapterOf(state.book, state.chapter);
+      if (!nxt) { stopContinuous(); return; }   // reached end of Revelation
+      loadChapterThenContinue(nxt.code, nxt.chapter);
+    }
+  );
+}
+
+async function loadChapterThenContinue(code, chapter) {
+  const wasContinuous = continuousMode;
+  const [, name] = ALL.find(b => b[0] === code);
+  const expectedRef = `${name} ${chapter}`;
+  await loadChapter(code, chapter, true);       // suppress the ttsStop reset
+  // Only continue if the intended chapter actually loaded (guards against network errors looping)
+  const arrived = currentChapter && currentChapter.ref === expectedRef;
+  if (wasContinuous && arrived) { continuousMode = true; readCurrentThenAdvance(); }
+  else if (wasContinuous && !arrived) { stopContinuous(); }
+}
+
+function pauseContinuous() {
+  speechSynthesis.cancel();
+  if (ttsController) { ttsController.stop(); ttsController = null; }
+  updateListenBar();
+}
+function resumeContinuous() {
+  if (!continuousMode) return;
+  readCurrentThenAdvance();
+}
+function stopContinuous() {
+  continuousMode = false;
+  stopAfterChapter = false;
+  if (ttsController) { ttsController.stop(); ttsController = null; }
+  speechSynthesis.cancel();
+  releaseWakeLock();
+  clearSleepTimer();
+  document.querySelectorAll(".reading").forEach(e => e.classList.remove("reading"));
+  const bar = document.getElementById("listenBar");
+  if (bar) bar.remove();
+}
+
+function skipChapter(dir) {
+  const move = dir > 0 ? nextChapterOf(state.book, state.chapter) : prevChapterOf(state.book, state.chapter);
+  if (!move) return;
+  if (ttsController) { ttsController.stop(); ttsController = null; }
+  speechSynthesis.cancel();
+  loadChapterThenContinue(move.code, move.chapter);
+}
+
+/* Sleep timer */
+function clearSleepTimer() {
+  if (sleepTimer) { clearTimeout(sleepTimer); sleepTimer = null; }
+}
+function setSleepTimer(minutes) {
+  clearSleepTimer();
+  sleepTimer = setTimeout(() => { stopContinuous(); }, minutes * 60 * 1000);
+  updateListenBar();
+}
+
+/* Listening-mode control bar */
+function buildListenBar() {
+  let bar = document.getElementById("listenBar");
+  if (bar) bar.remove();
+  bar = document.createElement("div");
+  bar.id = "listenBar";
+  bar.className = "listen-bar";
+  bar.innerHTML = `
+    <div class="listen-status" id="listenStatus"></div>
+    <div class="listen-controls">
+      <button class="listen-skip" id="listenPrev" title="Previous chapter">\u23EE</button>
+      <button class="listen-play" id="listenPlay" title="Pause">\u23F8</button>
+      <button class="listen-skip" id="listenNext" title="Next chapter">\u23ED</button>
+    </div>
+    <div class="listen-opts">
+      <button class="listen-opt" id="listenStopAfter">Stop after this chapter</button>
+      <button class="listen-opt" id="listenSleep">Sleep in 20 min</button>
+      <button class="listen-opt listen-end" id="listenEnd">End</button>
+    </div>`;
+  document.body.appendChild(bar);
+  $("listenPrev").addEventListener("click", () => skipChapter(-1));
+  $("listenNext").addEventListener("click", () => skipChapter(1));
+  $("listenPlay").addEventListener("click", () => {
+    if (ttsController) { pauseContinuous(); }
+    else { resumeContinuous(); }
+  });
+  $("listenStopAfter").addEventListener("click", () => {
+    stopAfterChapter = !stopAfterChapter;
+    updateListenBar();
+  });
+  $("listenSleep").addEventListener("click", () => {
+    if (sleepTimer) { clearSleepTimer(); }
+    else { setSleepTimer(20); }
+    updateListenBar();
+  });
+  $("listenEnd").addEventListener("click", stopContinuous);
+  updateListenBar();
+}
+
+function updateListenBar() {
+  const bar = document.getElementById("listenBar");
+  if (!bar) return;
+  const status = $("listenStatus");
+  if (status && currentChapter) {
+    status.innerHTML = `<span class="ls-now">Now reading${wakeLock ? " \u00B7 screen staying awake" : ""}</span><span class="ls-ref">${currentChapter.ref}</span>`;
+  }
+  const play = $("listenPlay");
+  if (play) play.innerHTML = ttsController ? "\u23F8" : "\u25B6";
+  const sa = $("listenStopAfter");
+  if (sa) sa.classList.toggle("on", stopAfterChapter);
+  const sl = $("listenSleep");
+  if (sl) { sl.classList.toggle("on", !!sleepTimer); sl.textContent = sleepTimer ? "Sleep timer on" : "Sleep in 20 min"; }
 }
 
 /* ---------- Anthropic API key (yours, stored only in this browser) ---------- */
@@ -1523,6 +1746,7 @@ $("emailEditBtn").addEventListener("click", () => {
 });
 
 $("backBtn").addEventListener("click", () => {
+  stopContinuous();
   ttsStop();
   state.book = null;
   state.chapter = null;
