@@ -37,6 +37,18 @@
   }
   header h1 { font-weight: 500; font-size: 1.25rem; letter-spacing: 0.16em; text-transform: uppercase; }
   header h1 span { color: var(--rubric); }
+  .header-right { display: flex; align-items: center; gap: 0.75rem; }
+  .gear-btn {
+    font-family: var(--sans); font-size: 1rem; line-height: 1;
+    background: none; border: 1px solid var(--rule); border-radius: 6px;
+    padding: 0.35rem 0.5rem; color: var(--muted); cursor: pointer;
+  }
+  .gear-btn:hover { background: var(--hover); color: var(--ink); }
+  .settings-menu-head {
+    font-family: var(--sans); font-size: 0.64rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--rubric);
+    padding: 0.35rem 0.7rem 0.4rem;
+  }
   .trans-wrap {
     display: flex; align-items: center; gap: 0.5rem;
     font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.08em;
@@ -570,9 +582,19 @@
 
 <header>
   <h1>The Holy <span>Bible</span></h1>
-  <div class="trans-wrap">
-    <label for="translation">Translation</label>
-    <select id="translation"></select>
+  <div class="header-right">
+    <div class="trans-wrap">
+      <label for="translation">Translation</label>
+      <select id="translation"></select>
+    </div>
+    <div class="settings-wrap">
+      <button class="gear-btn" id="settingsBtn" title="Settings" aria-haspopup="true">&#9881;</button>
+      <div class="settings-menu" id="settingsMenu" hidden>
+        <div class="settings-menu-head">Settings</div>
+        <button class="settings-item" id="keyBtn">&#128273;&nbsp; API key</button>
+        <button class="settings-item" id="emailEditBtn">&#9998;&nbsp; Default email address</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -603,14 +625,6 @@
       <button class="back-btn" id="sizeDown" title="Smaller text">A&minus;</button>
       <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
       <button class="back-btn" id="voiceBtn" title="Reading voice">&#127908;</button>
-      <div class="settings-wrap">
-        <button class="back-btn" id="settingsBtn" title="Settings" aria-haspopup="true">&#9881;</button>
-        <div class="settings-menu" id="settingsMenu" hidden>
-          <button class="settings-item" id="emailBtn">&#9993;&nbsp; Email this chapter</button>
-          <button class="settings-item" id="emailEditBtn">&#9998;&nbsp; Change email address</button>
-          <button class="settings-item" id="keyBtn">&#128273;&nbsp; API key</button>
-        </div>
-      </div>
     </div>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
@@ -800,6 +814,7 @@ async function loadChapter(code, chapter, keepReading) {
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
       <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud"><span class="rb-ico">&#9654;</span> Read chapter</button>
       <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter"><span class="rb-ico">&#9654;&#9654;</span> Read continuously</button>
+      <button class="read-btn" id="emailBtn" title="Email this chapter">&#9993; Email chapter</button>
     </div>`;
   const pager = `
     <div class="pager">
@@ -863,6 +878,8 @@ async function loadChapter(code, chapter, keepReading) {
     } else if (readCont) {
       readCont.style.display = "none";
     }
+    const emailCh = $("emailBtn");
+    if (emailCh) emailCh.addEventListener("click", sendChapterEmail);
     reportFums(fumsToken);
   } catch (err) {
     reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
@@ -1238,7 +1255,7 @@ document.addEventListener("click", (e) => {
   if (menu && !menu.hidden && !e.target.closest(".settings-wrap")) menu.hidden = true;
 });
 // Close the menu after choosing any item
-["emailBtn", "emailEditBtn", "keyBtn"].forEach(id => {
+["emailEditBtn", "keyBtn"].forEach(id => {
   const b = $(id);
   if (b) b.addEventListener("click", () => { const m = $("settingsMenu"); if (m) m.hidden = true; });
 });
@@ -1766,11 +1783,11 @@ function saveEmail(addr) {
   try { localStorage.setItem("bible.emailTo", addr); } catch (e) {}
 }
 
-$("emailBtn").addEventListener("click", () => {
+function sendChapterEmail() {
   if (!currentChapter) return;
   let to = getSavedEmail();
   if (!to) {
-    to = (window.prompt("Email address to send chapters to?\n(Saved as your default — use the \u270E button to change it later.)", "") || "").trim();
+    to = (window.prompt("Email address to send chapters to?\n(Saved as your default \u2014 change it later under Settings.)", "") || "").trim();
     if (!to) return;
     saveEmail(to);
   }
@@ -1783,7 +1800,7 @@ $("emailBtn").addEventListener("click", () => {
   body += "\n\n" + subject;
   window.location.href =
     `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-});
+}
 
 $("emailEditBtn").addEventListener("click", () => {
   const current = getSavedEmail();
