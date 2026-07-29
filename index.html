@@ -100,19 +100,20 @@
 
   .welcome { color: var(--muted); font-size: 1.05rem; font-style: italic; margin-top: 1rem; }
 
-  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 0.7rem; }
   .passage-head .chapnum { font-size: 3.2rem; line-height: 1; color: var(--rubric); }
   .passage-head .transname {
     font-family: var(--sans); font-size: 0.68rem; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--muted);
   }
-  .passage-head .read-btn { align-self: center; }
-  /* On narrow screens the two read buttons share a row evenly below the chapter number */
+  .chapter-controls {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    padding-bottom: 1.1rem; margin-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+  }
+  .chapter-controls .summary-btn { margin-right: auto; }
   @media (max-width: 560px) {
-    .passage-head { gap: 0.5rem 0.6rem; }
-    .passage-head #readChapterBtn { margin-left: auto; }
-    .passage-head #readChapterBtn, .passage-head #readContinuousBtn { flex: 1; text-align: center; min-width: 0; }
-    .passage-head .summary-btn { flex-basis: 100%; }
+    .chapter-controls .summary-btn { flex-basis: 100%; margin-right: 0; }
+    .chapter-controls #readChapterBtn, .chapter-controls #readContinuousBtn { flex: 1; text-align: center; }
   }
 
   .scripture { font-size: var(--fs, 1.16rem); line-height: 1.75; }
@@ -266,7 +267,7 @@
   .ex-body details[open] > summary .sec-copy { display: inline-block; }
   .sec-copy:hover { background: var(--hover); color: var(--ink); }
   .sec-copy:active { background: var(--hover); color: var(--rubric); }
-  .summary-btn { margin-left: auto; align-self: center; }
+  .summary-btn { align-self: center; }
   .ex-body details {
     border-top: 1px solid var(--rule);
     padding: 0.15rem 0;
@@ -775,9 +776,11 @@ async function loadChapter(code, chapter, keepReading) {
     <div class="passage-head">
       <span class="chapnum">${chapter}</span>
       <div class="transname">${transName}</div>
+    </div>
+    <div class="chapter-controls">
+      <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
       <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud"><span class="rb-ico">&#9654;</span> Read chapter</button>
       <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter"><span class="rb-ico">&#9654;&#9654;</span> Read continuously</button>
-      <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
     </div>`;
   const pager = `
     <div class="pager">
