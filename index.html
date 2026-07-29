@@ -75,6 +75,20 @@
   #readView { padding: 1.4rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 46rem; margin: 0 auto; }
   .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
   .read-tools { margin-left: auto; display: flex; gap: 4px; }
+  .settings-wrap { position: relative; }
+  .settings-menu {
+    position: absolute; right: 0; top: calc(100% + 4px);
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(28,27,26,0.18); padding: 0.3rem; z-index: 30; min-width: 12.5rem;
+  }
+  .settings-menu[hidden] { display: none; }
+  .settings-item {
+    display: block; width: 100%; text-align: left;
+    font-family: var(--sans); font-size: 0.82rem; color: var(--ink);
+    background: none; border: none; border-radius: 5px; padding: 0.55rem 0.7rem; cursor: pointer;
+  }
+  .settings-item:hover { background: var(--hover); }
+  .settings-item:active { background: var(--hover); color: var(--rubric); }
   .back-btn {
     font-family: var(--sans); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em;
     background: none; border: 1px solid var(--rule); border-radius: 4px;
@@ -588,10 +602,15 @@
     <div class="read-tools">
       <button class="back-btn" id="sizeDown" title="Smaller text">A&minus;</button>
       <button class="back-btn" id="sizeUp" title="Larger text">A+</button>
-      <button class="back-btn" id="emailBtn" title="Email this chapter">&#9993; Email</button>
-      <button class="back-btn" id="emailEditBtn" title="Change email address">&#9998;</button>
       <button class="back-btn" id="voiceBtn" title="Reading voice">&#127908;</button>
-      <button class="back-btn" id="keyBtn" title="Anthropic API key for exegesis">&#128273;</button>
+      <div class="settings-wrap">
+        <button class="back-btn" id="settingsBtn" title="Settings" aria-haspopup="true">&#9881;</button>
+        <div class="settings-menu" id="settingsMenu" hidden>
+          <button class="settings-item" id="emailBtn">&#9993;&nbsp; Email this chapter</button>
+          <button class="settings-item" id="emailEditBtn">&#9998;&nbsp; Change email address</button>
+          <button class="settings-item" id="keyBtn">&#128273;&nbsp; API key</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
@@ -1209,6 +1228,21 @@ function ensureApiKey() {
   }
   return k;
 }
+$("settingsBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const menu = $("settingsMenu");
+  menu.hidden = !menu.hidden;
+});
+document.addEventListener("click", (e) => {
+  const menu = $("settingsMenu");
+  if (menu && !menu.hidden && !e.target.closest(".settings-wrap")) menu.hidden = true;
+});
+// Close the menu after choosing any item
+["emailBtn", "emailEditBtn", "keyBtn"].forEach(id => {
+  const b = $(id);
+  if (b) b.addEventListener("click", () => { const m = $("settingsMenu"); if (m) m.hidden = true; });
+});
+
 $("voiceBtn").addEventListener("click", () => {
   if (!TTS.supported) { showToast("Read Aloud isn't available in this browser"); return; }
   ttsLoadVoices();
