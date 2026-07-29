@@ -100,11 +100,19 @@
 
   .welcome { color: var(--muted); font-size: 1.05rem; font-style: italic; margin-top: 1rem; }
 
-  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; }
+  .passage-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
   .passage-head .chapnum { font-size: 3.2rem; line-height: 1; color: var(--rubric); }
   .passage-head .transname {
     font-family: var(--sans); font-size: 0.68rem; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--muted);
+  }
+  .passage-head .read-btn { align-self: center; }
+  /* On narrow screens the two read buttons share a row evenly below the chapter number */
+  @media (max-width: 560px) {
+    .passage-head { gap: 0.5rem 0.6rem; }
+    .passage-head #readChapterBtn { margin-left: auto; }
+    .passage-head #readChapterBtn, .passage-head #readContinuousBtn { flex: 1; text-align: center; min-width: 0; }
+    .passage-head .summary-btn { flex-basis: 100%; }
   }
 
   .scripture { font-size: var(--fs, 1.16rem); line-height: 1.75; }
@@ -462,6 +470,8 @@
     padding: 0.45rem 0.8rem; color: var(--ink); cursor: pointer; white-space: nowrap;
   }
   .read-btn:hover { background: var(--hover); }
+  .read-btn .rb-ico { color: var(--rubric); font-size: 0.82em; letter-spacing: -0.05em; margin-right: 0.15em; }
+  .read-btn.tts-on .rb-ico { color: var(--paper); }
   .read-btn:active { background: var(--hover); color: var(--rubric); }
   .read-btn.tts-on { background: var(--rubric); border-color: var(--rubric); color: var(--paper); }
   .ex-speak {
@@ -765,8 +775,8 @@ async function loadChapter(code, chapter, keepReading) {
     <div class="passage-head">
       <span class="chapnum">${chapter}</span>
       <div class="transname">${transName}</div>
-      <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud">&#128266; Read</button>
-      <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter">&#9193; Read continuously</button>
+      <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud"><span class="rb-ico">&#9654;</span> Read chapter</button>
+      <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter"><span class="rb-ico">&#9654;&#9654;</span> Read continuously</button>
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
     </div>`;
   const pager = `
