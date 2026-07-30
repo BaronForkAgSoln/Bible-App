@@ -1622,8 +1622,53 @@ $("reflectBtn").addEventListener("click", () => {
 $("verseAskBtn").addEventListener("click", () => {
   if (!currentChapter || !chapterVerses || !selRange()) return;
   const { ref, text } = selectedPassage();
-  showAsk(null, { ref, text, trans: currentChapter.trans });
+  mountVerseAskPanel(ref, text, currentChapter.trans);
 });
+
+/* Inline Ask panel below the chapter (mirrors the Exegesis/Devotional pattern) */
+function mountVerseAskPanel(ref, text, trans) {
+  const old = document.getElementById("exegesisPanel");
+  if (old) old.remove();
+  const panel = document.createElement("div");
+  panel.className = "exegesis-panel";
+  panel.id = "exegesisPanel";
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>Ask \u2014 ${escapeHtml(ref)}</span>
+      <div class="ex-tools"><button class="ex-close" title="Close">\u2715</button></div>
+    </div>
+    <div class="ex-body">
+      <div class="ask-row">
+        <textarea id="inlineAskInput" rows="1" placeholder="Ask about ${escapeHtml(ref)}\u2026"></textarea>
+        <button class="ask-begin" id="inlineAskGo">Ask</button>
+      </div>
+    </div>`;
+  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  const reader = $("reader");
+  const pager = reader.querySelector(".pager");
+  if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+  const input = panel.querySelector("#inlineAskInput");
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); }
+  });
+  function go() {
+    const question = input.value.trim();
+    if (!question) { input.focus(); return; }
+    saveRecentQuestion(`${ref} \u2014 ${question}`);
+    askShowAll = false;
+    streamLens({
+      title: `Ask \u2014 ${ref}`,
+      prompt: buildAskPrompt(question, { ref, text, trans }),
+      structured: false,
+      metaOverride: { title: `Ask \u2014 ${ref}`, label: "Q&A", trans: currentTransName() }
+    });
+  }
+  panel.querySelector("#inlineAskGo").addEventListener("click", go);
+  setTimeout(() => input.focus(), 50);
+}
 
 function copyChapter() {
   if (!currentChapter) return;
@@ -1720,6 +1765,7 @@ function renderRecent() {
 }
 
 let askVerseContext = null;   // {ref, text, trans} when asking about a specific verse
+let askReturn = null;         // {code, chapter, label} to return to a chapter after a verse-level Ask
 
 function showAsk(seedContext, verseCtx) {
   askVerseContext = verseCtx || null;
@@ -1748,6 +1794,7 @@ function showAsk(seedContext, verseCtx) {
   const ctxClear = $("askCtxClear");
   if (ctxClear) ctxClear.addEventListener("click", () => { askVerseContext = null; showAsk(); });
   renderRecent();
+  updateAskBackLabel();
   showView("askView");
   if (seedContext && typeof seedContext === "string") {
     input.value = seedContext;
@@ -1803,8 +1850,21 @@ function runAsk() {
   }
 }
 
-$("askBtn").addEventListener("click", showAsk);
-$("askBackBtn").addEventListener("click", () => { $("askReader").innerHTML = ""; showView("booksView"); });
+$("askBtn").addEventListener("click", () => { askReturn = null; showAsk(); });
+$("askBackBtn").addEventListener("click", () => {
+  $("askReader").innerHTML = "";
+  if (askReturn) {
+    const r = askReturn; askReturn = null;
+    loadChapter(r.code, r.chapter);
+    showView("readView");
+  } else {
+    showView("booksView");
+  }
+});
+function updateAskBackLabel() {
+  const b = $("askBackBtn");
+  if (b) b.innerHTML = askReturn ? `&larr; ${escapeHtml(askReturn.label)}` : "&larr; Books";
+}
 
 
 /* Text size — steps applied to the scripture body, remembered per device */
