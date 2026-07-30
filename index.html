@@ -474,11 +474,8 @@
     background: #F5E6E6; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.7rem;
   }
   .ask-context strong { font-weight: 600; }
-  .inline-ask-row { align-items: stretch; }
-  .inline-ask-row textarea {
-    min-height: 5.5rem; font-size: 1rem; line-height: 1.5; padding: 0.7rem 0.85rem;
-  }
-  .inline-ask-row .ask-begin { align-self: stretch; padding: 0 1.4rem; }  .ask-context-x {
+  .verse-ask-card { background: none; border-left: none; border-radius: 0; padding: 0; }
+  .verse-ask-card .ask-q { font-size: 1.15rem; margin: 0 0 0.15rem; }  .ask-context-x {
     margin-left: auto; background: none; border: none; cursor: pointer;
     color: var(--muted); font-size: 0.9rem; padding: 0.1rem 0.3rem;
   }
@@ -1629,7 +1626,8 @@ $("verseAskBtn").addEventListener("click", () => {
   mountVerseAskPanel(ref, text, currentChapter.trans);
 });
 
-/* Inline Ask panel below the chapter (mirrors the Exegesis/Devotional pattern) */
+/* Inline Ask panel below the chapter (mirrors the Exegesis/Devotional pattern,
+   styled like the "Ask a Bible Question" card) */
 function mountVerseAskPanel(ref, text, trans) {
   const old = document.getElementById("exegesisPanel");
   if (old) old.remove();
@@ -1642,9 +1640,13 @@ function mountVerseAskPanel(ref, text, trans) {
       <div class="ex-tools"><button class="ex-close" title="Close">\u2715</button></div>
     </div>
     <div class="ex-body">
-      <div class="ask-row inline-ask-row">
-        <textarea id="inlineAskInput" rows="3" placeholder="Ask about ${escapeHtml(ref)}\u2026"></textarea>
-        <button class="ask-begin" id="inlineAskGo">Ask</button>
+      <div class="daily-ask verse-ask-card">
+        <p class="ask-q">What would you like to ask?</p>
+        <p class="ask-sub">About ${escapeHtml(ref)} \u2014 a meaning, a word, the context, a connection.</p>
+        <div class="ask-row">
+          <textarea id="inlineAskInput" rows="1" placeholder=""></textarea>
+          <button class="ask-begin" id="inlineAskGo">Ask</button>
+        </div>
       </div>
     </div>`;
   panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
