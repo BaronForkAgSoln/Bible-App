@@ -474,7 +474,11 @@
     background: #F5E6E6; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.7rem;
   }
   .ask-context strong { font-weight: 600; }
-  .ask-context-x {
+  .inline-ask-row { align-items: stretch; }
+  .inline-ask-row textarea {
+    min-height: 5.5rem; font-size: 1rem; line-height: 1.5; padding: 0.7rem 0.85rem;
+  }
+  .inline-ask-row .ask-begin { align-self: stretch; padding: 0 1.4rem; }  .ask-context-x {
     margin-left: auto; background: none; border: none; cursor: pointer;
     color: var(--muted); font-size: 0.9rem; padding: 0.1rem 0.3rem;
   }
@@ -1638,8 +1642,8 @@ function mountVerseAskPanel(ref, text, trans) {
       <div class="ex-tools"><button class="ex-close" title="Close">\u2715</button></div>
     </div>
     <div class="ex-body">
-      <div class="ask-row">
-        <textarea id="inlineAskInput" rows="1" placeholder="Ask about ${escapeHtml(ref)}\u2026"></textarea>
+      <div class="ask-row inline-ask-row">
+        <textarea id="inlineAskInput" rows="3" placeholder="Ask about ${escapeHtml(ref)}\u2026"></textarea>
         <button class="ask-begin" id="inlineAskGo">Ask</button>
       </div>
     </div>`;
