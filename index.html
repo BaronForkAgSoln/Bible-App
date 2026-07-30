@@ -461,6 +461,24 @@
     padding: 0.2rem 0.4rem; border-radius: 4px;
   }
   .ask-recent-del:hover { color: var(--rubric); background: var(--hover); }
+  .ask-recent-more {
+    display: block; width: 100%; text-align: center;
+    font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.05em;
+    background: none; border: none; color: var(--rubric); cursor: pointer;
+    padding: 0.6rem 0.2rem;
+  }
+  .ask-recent-more:hover { text-decoration: underline; }
+  .ask-context {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: var(--sans); font-size: 0.8rem; color: var(--ink);
+    background: #F5E6E6; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.7rem;
+  }
+  .ask-context strong { font-weight: 600; }
+  .ask-context-x {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 0.9rem; padding: 0.1rem 0.3rem;
+  }
+  .ask-context-x:hover { color: var(--rubric); }
 
   /* ---------- Waiting state (before streaming begins) ---------- */
   .ex-wait { display: flex; align-items: center; gap: 0.7rem; color: var(--muted); padding: 0.3rem 0; }
@@ -1604,8 +1622,7 @@ $("reflectBtn").addEventListener("click", () => {
 $("verseAskBtn").addEventListener("click", () => {
   if (!currentChapter || !chapterVerses || !selRange()) return;
   const { ref, text } = selectedPassage();
-  const seed = `About ${ref} (${currentChapter.trans}): "${text}"\n\nMy question: `;
-  showAsk(seed);
+  showAsk(null, { ref, text, trans: currentChapter.trans });
 });
 
 function copyChapter() {
@@ -1635,7 +1652,9 @@ End with exactly this line:
 }
 
 /* ---------- Ask a Bible Question ---------- */
-const ASK_RECENT_MAX = 3;
+const ASK_RECENT_MAX = 50;   // total questions kept in history
+const ASK_RECENT_SHOWN = 5;  // shown under the box before "Show all"
+let askShowAll = false;
 
 function getRecentQuestions() {
   try { return JSON.parse(localStorage.getItem("bible.recentQuestions") || "[]"); } catch (e) { return []; }
@@ -1662,43 +1681,58 @@ function currentTransName() {
 function renderRecent() {
   const wrap = $("askRecent");
   if (!wrap) return;
-  const list = getRecentQuestions();
-  if (!list.length) { wrap.innerHTML = ""; return; }
-  wrap.innerHTML =
-    `<div class="ask-recent-head"><span>Recent</span><button class="ask-recent-clear" id="askRecentClear">Clear all</button></div>` +
-    list.map(q => `<div class="ask-recent-item" data-q="${escapeHtml(q)}">` +
+  const full = getRecentQuestions();
+  if (!full.length) { wrap.innerHTML = ""; return; }
+  const showing = askShowAll ? full : full.slice(0, ASK_RECENT_SHOWN);
+  const hiddenCount = full.length - showing.length;
+  let html = `<div class="ask-recent-head"><span>Recent</span><button class="ask-recent-clear" id="askRecentClear">Clear all</button></div>`;
+  html += showing.map(q => `<div class="ask-recent-item" data-q="${escapeHtml(q)}">` +
       `<span class="ari-icon">\u21A9</span>` +
       `<span class="ari-text">${escapeHtml(q)}</span>` +
       `<button class="ask-recent-del" title="Remove">\u2715</button></div>`).join("");
+  if (hiddenCount > 0) {
+    html += `<button class="ask-recent-more" id="askShowAll">Show all (${full.length})</button>`;
+  } else if (askShowAll && full.length > ASK_RECENT_SHOWN) {
+    html += `<button class="ask-recent-more" id="askShowLess">Show less</button>`;
+  }
+  wrap.innerHTML = html;
   wrap.querySelectorAll(".ask-recent-item").forEach((row, i) => {
-    row.querySelector(".ari-text").addEventListener("click", () => {
+    const q = showing[i];
+    const fill = () => {
       const input = $("askInput");
-      input.value = list[i];
+      input.value = q;
       input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
       input.focus();
-    });
-    row.querySelector(".ari-icon").addEventListener("click", () => {
-      const input = $("askInput");
-      input.value = list[i];
-      input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
-      input.focus();
-    });
+    };
+    row.querySelector(".ari-text").addEventListener("click", fill);
+    row.querySelector(".ari-icon").addEventListener("click", fill);
     row.querySelector(".ask-recent-del").addEventListener("click", (e) => {
       e.stopPropagation();
-      removeRecentQuestion(list[i]);
+      removeRecentQuestion(q);
       renderRecent();
     });
   });
-  $("askRecentClear").addEventListener("click", () => { clearRecentQuestions(); renderRecent(); });
+  $("askRecentClear").addEventListener("click", () => { clearRecentQuestions(); askShowAll = false; renderRecent(); });
+  const more = $("askShowAll");
+  if (more) more.addEventListener("click", () => { askShowAll = true; renderRecent(); });
+  const less = $("askShowLess");
+  if (less) less.addEventListener("click", () => { askShowAll = false; renderRecent(); });
 }
 
-function showAsk(seedContext) {
+let askVerseContext = null;   // {ref, text, trans} when asking about a specific verse
+
+function showAsk(seedContext, verseCtx) {
+  askVerseContext = verseCtx || null;
   const el = $("askReader");
+  const ctxChip = askVerseContext
+    ? `<div class="ask-context">About <strong>${escapeHtml(askVerseContext.ref)}</strong><button class="ask-context-x" id="askCtxClear" title="Ask without this verse">\u2715</button></div>`
+    : "";
   el.innerHTML = `
     <div class="daily-ask" id="askCard">
       <div class="ask-head">Ask a Bible Question</div>
       <p class="ask-q">What would you like to ask?</p>
       <p class="ask-sub">Anything about Scripture \u2014 a passage, a person, a word, a theme, a difference between traditions.</p>
+      ${ctxChip}
       <div class="ask-row">
         <textarea id="askInput" rows="1" placeholder=""></textarea>
         <button class="ask-begin" id="askGo">Ask</button>
@@ -1711,21 +1745,25 @@ function showAsk(seedContext) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runAsk(); }
   });
   $("askGo").addEventListener("click", runAsk);
+  const ctxClear = $("askCtxClear");
+  if (ctxClear) ctxClear.addEventListener("click", () => { askVerseContext = null; showAsk(); });
   renderRecent();
   showView("askView");
   if (seedContext && typeof seedContext === "string") {
     input.value = seedContext;
     setTimeout(() => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; }, 0);
-    $("askRecent").style.display = "none";  // hide recents when focused on a specific verse
   }
   setTimeout(() => { input.focus(); const n = input.value.length; input.setSelectionRange(n, n); }, 50);
 }
 
-function buildAskPrompt(question) {
+function buildAskPrompt(question, verseCtx) {
   const trans = currentTransName();
+  const ctxLine = verseCtx
+    ? `The reader is asking specifically about ${verseCtx.ref} (${verseCtx.trans}): "${verseCtx.text}"\n\nTheir question about it:\n"${question}"`
+    : `"${question}"`;
   return `A reader of a Bible study app has asked this question:
 
-"${question}"
+${ctxLine}
 
 Answer it clearly and helpfully, as a knowledgeable, trustworthy Bible teacher would. Guidelines:
 - Ground the answer in Scripture; cite specific references, and quote briefly from the ${trans} translation where a quotation helps.
@@ -1740,17 +1778,22 @@ function runAsk() {
   const input = $("askInput");
   const question = input ? input.value.trim() : "";
   if (!question) { if (input) input.focus(); return; }
-  saveRecentQuestion(question);
-  const meta = { title: "Ask a Bible Question", label: "Q&A", trans: currentTransName() };
+  const verseCtx = askVerseContext;
+  // History entry is tagged with the verse when present
+  const historyEntry = verseCtx ? `${verseCtx.ref} \u2014 ${question}` : question;
+  saveRecentQuestion(historyEntry);
+  askShowAll = false;
+  const meta = { title: verseCtx ? `Ask \u2014 ${verseCtx.ref}` : "Ask a Bible Question", label: "Q&A", trans: currentTransName() };
   const card = $("askCard");
   if (card) card.remove();
   streamLens({
-    title: "Ask a Bible Question",
-    prompt: buildAskPrompt(question),
+    title: meta.title,
+    prompt: buildAskPrompt(question, verseCtx),
     structured: false,
     target: $("askReader"),
     metaOverride: meta
   });
+  askVerseContext = null;
   // When the answer panel is closed, return to the question screen
   const panel = document.getElementById("exegesisPanel");
   if (panel) {
