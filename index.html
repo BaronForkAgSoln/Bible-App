@@ -635,7 +635,6 @@
     <button id="exegesisBtn">Exegesis</button>
     <button id="reflectBtn">Devotional</button>
     <button id="verseAskBtn">Ask</button>
-    <button id="verseReadBtn">&#128266;</button>
     <button id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
@@ -818,6 +817,7 @@ async function loadChapter(code, chapter, keepReading) {
       <button class="back-btn summary-btn" id="summaryBtn" title="Chapter context and themes">&#10087; Chapter Summary</button>
       <button class="read-btn" id="readChapterBtn" title="Read this chapter aloud"><span class="rb-ico">&#9654;</span> Read chapter</button>
       <button class="read-btn" id="readContinuousBtn" title="Read continuously, chapter after chapter"><span class="rb-ico">&#9654;&#9654;</span> Read continuously</button>
+      <button class="read-btn" id="copyChapterBtn" title="Copy this chapter">&#x29C9; Copy</button>
     </div>`;
   const pager = `
     <div class="pager">
@@ -881,6 +881,8 @@ async function loadChapter(code, chapter, keepReading) {
     } else if (readCont) {
       readCont.style.display = "none";
     }
+    const copyCh = $("copyChapterBtn");
+    if (copyCh) copyCh.addEventListener("click", copyChapter);
     reportFums(fumsToken);
   } catch (err) {
     reader.innerHTML = `<p class="status error">Couldn't load ${name} ${chapter} (${err.message}).
@@ -1606,16 +1608,20 @@ $("verseAskBtn").addEventListener("click", () => {
   showAsk(seed);
 });
 
-$("verseReadBtn").addEventListener("click", () => {
-  if (!currentChapter || !chapterVerses || !selRange()) return;
-  const btn = $("verseReadBtn");
-  if (!TTS.supported) return;
-  const [a, b] = selRange();
-  const verses = chapterVerses.filter(v => v.n >= a && v.n <= b);
-  const chunks = verses.map(v => v.text);
-  const els = verses.map(v => document.querySelector(`#reader .verse[data-v="${v.n}"]`)).filter(Boolean);
-  ttsToggle(btn, chunks, els.length ? els : null);
-});
+function copyChapter() {
+  if (!currentChapter) return;
+  const verses = chapterVerses
+    ? chapterVerses.map(v => `${v.n} ${v.text}`).join("\n")
+    : Array.from(document.querySelectorAll("#reader .scripture .verse")).map(s => s.textContent.trim()).join("\n");
+  const payload = `${currentChapter.ref} (${currentChapter.trans})\n\n${verses}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload)
+      .then(() => showToast(`${currentChapter.ref} copied`))
+      .catch(() => window.prompt("Copy this chapter:", payload));
+  } else {
+    window.prompt("Copy this chapter:", payload);
+  }
+}
 
 function runChapterSummary() {
   if (!currentChapter) return;
