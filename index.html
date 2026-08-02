@@ -529,9 +529,15 @@
     margin: 0 0 0.9rem; padding-bottom: 0.7rem; border-bottom: 1px solid var(--rule);
   }
   .add-voice-head {
+    display: flex; align-items: center; justify-content: space-between;
     font-family: var(--sans); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--rubric); margin-bottom: 0.7rem;
   }
+  .add-voice-x {
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    font-size: 0.9rem; padding: 0.15rem 0.4rem; border-radius: 4px; letter-spacing: 0;
+  }
+  .add-voice-x:hover { color: var(--rubric); background: var(--hover); }
   .av-assessing { display: flex; align-items: center; gap: 0.5rem; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.8rem; }
   .av-box { border-radius: 6px; padding: 0.7rem 0.85rem; margin-top: 0.8rem; }
   .av-title { font-family: var(--sans); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.2rem; }
@@ -1065,8 +1071,11 @@ function updateSelBar() {
   if (!r || !currentChapter) { bar.hidden = true; return; }
   const [a, b] = r;
   $("selRef").textContent = `${currentChapter.ref}:${a === b ? a : a + "\u2013" + b}`;
-  bar.hidden = false;
+  // Keep the floating bar hidden while a study panel is open (it would overlap the panel)
+  bar.hidden = !!document.getElementById("exegesisPanel");
 }
+function hideSelBarForPanel() { const bar = $("selBar"); if (bar) bar.hidden = true; }
+function restoreSelBar() { updateSelBar(); }
 
 $("selClearBtn").addEventListener("click", () => {
   selectedVerses.clear();
@@ -1446,10 +1455,11 @@ function mountExegesisPanel(title, withHeaderCopy, target) {
       </div>
     </div>
     <div class="ex-body"><p class="ex-status">Preparing\u2026</p></div>`;
-  panel.querySelector(".ex-close").addEventListener("click", () => { ttsStop(); panel.remove(); });
+  panel.querySelector(".ex-close").addEventListener("click", () => { ttsStop(); panel.remove(); restoreSelBar(); });
   const reader = target || $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  hideSelBarForPanel();
   return panel;
 }
 
@@ -1761,10 +1771,11 @@ function mountCouncilPanel() {
       <div class="council-tier">Modern Voices <span class="cv-count">\u2014 ${modern.length} of ${MODERN_VOICES_MAX}</span></div>
       <div class="council-list" id="councilModernList">${modernRows}${addRow}</div>
     </div>`;
-  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  panel.querySelector(".ex-close").addEventListener("click", () => { panel.remove(); restoreSelBar(); });
   const reader = $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  hideSelBarForPanel();
   panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
   panel.querySelectorAll(".council-item").forEach(btn => {
@@ -1838,7 +1849,10 @@ function showAddVoiceForm() {
   if (!list) return;
   list.innerHTML = `
     <div class="add-voice">
-      <div class="add-voice-head">Add a modern voice</div>
+      <div class="add-voice-head">
+        <span>Add a modern voice</span>
+        <button class="add-voice-x" id="addVoiceCancel" title="Back">&#10005;</button>
+      </div>
       <div class="ask-row">
         <textarea id="addVoiceInput" rows="1" placeholder="Name of a Bible teacher, theologian, or preacher"></textarea>
         <button class="ask-begin" id="addVoiceAssess">Assess</button>
@@ -1849,8 +1863,10 @@ function showAddVoiceForm() {
   input.focus();
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); assessVoice(); }
+    if (e.key === "Escape") { e.preventDefault(); mountCouncilPanel(); }
   });
   $("addVoiceAssess").addEventListener("click", assessVoice);
+  $("addVoiceCancel").addEventListener("click", mountCouncilPanel);
 }
 
 async function assessVoice() {
@@ -1950,10 +1966,11 @@ function mountYouthPanel() {
       <p class="council-intro">For which age? The explanation, example, and takeaway are shaped to fit.</p>
       <div class="youth-bands">${bands}</div>
     </div>`;
-  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  panel.querySelector(".ex-close").addEventListener("click", () => { panel.remove(); restoreSelBar(); });
   const reader = $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  hideSelBarForPanel();
   panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
   panel.querySelectorAll(".youth-band").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -2007,10 +2024,11 @@ function mountVerseAskPanel(ref, text, trans) {
         </div>
       </div>
     </div>`;
-  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  panel.querySelector(".ex-close").addEventListener("click", () => { panel.remove(); restoreSelBar(); });
   const reader = $("reader");
   const pager = reader.querySelector(".pager");
   if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  hideSelBarForPanel();
   panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
   const input = panel.querySelector("#inlineAskInput");
