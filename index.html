@@ -218,6 +218,14 @@
     white-space: nowrap;
   }
   .sel-bar button:hover { background: rgba(253,253,251,0.12); }
+  .lens-btn {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 0.3rem 0.6rem !important; line-height: 1.05;
+  }
+  .lens-ltr { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; }
+  .lens-cap { font-size: 0.5rem; letter-spacing: 0.02em; color: rgba(253,253,251,0.65); text-transform: none; }
+  .lens-close { justify-content: center; font-size: 0.95rem; }
+  .lens-close .lens-cap { display: none; }
   .toast {
     position: fixed;
     left: 50%;
@@ -344,7 +352,9 @@
   .sel-bar button:active { background: rgba(253,253,251,0.22); transform: scale(0.97); }
   .sel-bar #exegesisBtn:active,
   .sel-bar #reflectBtn:active,
-  .sel-bar #verseAskBtn:active { background: var(--rubric); border-color: var(--rubric); }
+  .sel-bar #verseAskBtn:active,
+  .sel-bar #councilBtn:active,
+  .sel-bar #youthBtn:active { background: var(--rubric); border-color: var(--rubric); }
 
   /* Narrow phones: reference on its own line, buttons beneath, everything on screen */
   @media (max-width: 480px) {
@@ -475,7 +485,74 @@
   }
   .ask-context strong { font-weight: 600; }
   .verse-ask-card { background: none; border-left: none; border-radius: 0; padding: 0; }
-  .verse-ask-card .ask-q { font-size: 1.15rem; margin: 0 0 0.15rem; }  .ask-context-x {
+  .verse-ask-card .ask-q { font-size: 1.15rem; margin: 0 0 0.15rem; }
+
+  /* ---------- Council of Voices & Youth ---------- */
+  .council-intro { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: 0 0 0.9rem; line-height: 1.5; }
+  .council-tier {
+    font-family: var(--sans); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--rubric); margin: 1rem 0 0.1rem;
+  }
+  .council-tier .cv-count { color: var(--muted); font-weight: 400; }
+  .council-list { display: flex; flex-direction: column; }
+  .council-item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-top: 1px solid var(--rule); padding: 0.55rem 0.2rem; cursor: pointer; font-family: var(--serif);
+  }
+  .council-list .council-item:first-child { border-top: none; }
+  .council-item:hover .cv-name { color: var(--rubric); }
+  .council-auto { border: none; }
+  .council-auto .cv-name { color: var(--rubric); }
+  .cv-name { font-size: 1rem; color: var(--ink); }
+  .cv-note { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); }
+  .cv-flag {
+    font-family: var(--sans); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #A32D2D; background: #F7E9E9; border-radius: 3px; padding: 0.1rem 0.35rem; margin-left: 0.3rem;
+  }
+  .council-item-row { display: flex; align-items: center; border-top: 1px solid var(--rule); }
+  .council-item-row .council-item { border-top: none; flex: 1; }
+  .cv-del {
+    flex: none; background: none; border: none; cursor: pointer; color: var(--muted);
+    font-size: 0.9rem; padding: 0.3rem 0.5rem; border-radius: 4px;
+  }
+  .cv-del:hover { color: var(--rubric); background: var(--hover); }
+  .council-add {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-top: 1px solid var(--rule); padding: 0.6rem 0.2rem; cursor: pointer;
+    font-family: var(--serif); font-size: 1rem; color: var(--rubric);
+  }
+  .council-add:hover { background: var(--hover); }
+  .council-add .cv-slots { font-family: var(--sans); font-size: 0.7rem; color: var(--muted); }
+  .council-full { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--rule); padding: 0.7rem 0.2rem; }
+  .voice-subnote {
+    font-family: var(--sans); font-size: 0.68rem; font-style: italic; color: var(--muted);
+    margin: 0 0 0.9rem; padding-bottom: 0.7rem; border-bottom: 1px solid var(--rule);
+  }
+  .add-voice-head {
+    font-family: var(--sans); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--rubric); margin-bottom: 0.7rem;
+  }
+  .av-assessing { display: flex; align-items: center; gap: 0.5rem; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.8rem; }
+  .av-box { border-radius: 6px; padding: 0.7rem 0.85rem; margin-top: 0.8rem; }
+  .av-title { font-family: var(--sans); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.2rem; }
+  .av-reason { font-family: var(--sans); font-size: 0.78rem; line-height: 1.5; }
+  .av-strong { background: #EAF3E4; } .av-strong .av-title { color: #3B6D11; } .av-strong .av-reason { color: #2C3A1C; }
+  .av-moderate { background: #FBF3E0; } .av-moderate .av-title { color: #854F0B; } .av-moderate .av-reason { color: #4A3313; }
+  .av-limited { background: #F7E9E9; } .av-limited .av-title { color: #A32D2D; } .av-limited .av-reason { color: #5A1E1E; }
+  .av-no { background: #F1EFE8; } .av-no .av-title { color: #5F5E5A; } .av-no .av-reason { color: #444441; }
+  .av-actions { display: flex; justify-content: flex-end; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
+  .av-cancel { background: none; border: none; color: var(--muted); font-family: var(--sans); font-size: 0.8rem; cursor: pointer; padding: 0.4rem 0.6rem; }
+  .av-add { background: var(--rubric); color: var(--paper); border: none; border-radius: 5px; font-family: var(--sans); font-size: 0.8rem; padding: 0.45rem 1rem; cursor: pointer; }
+  .av-add:active { background: #762727; }
+  .youth-bands { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+  .youth-band {
+    font-family: var(--sans); font-size: 0.78rem; color: var(--ink); background: none;
+    border: 1px solid var(--rule); border-radius: 16px; padding: 0.4rem 0.85rem; cursor: pointer;
+  }
+  .youth-band:hover { background: var(--hover); border-color: var(--rubric); }
+  .youth-band:active { background: var(--rubric); color: var(--paper); }
+  .youth-band .yb-range { color: var(--muted); }
+  .youth-band:active .yb-range { color: rgba(253,253,251,0.75); }  .ask-context-x {
     margin-left: auto; background: none; border: none; cursor: pointer;
     color: var(--muted); font-size: 0.9rem; padding: 0.1rem 0.3rem;
   }
@@ -651,10 +728,12 @@
   <div id="reader"></div>
   <div class="sel-bar" id="selBar" hidden>
     <span class="sel-ref" id="selRef"></span>
-    <button id="exegesisBtn">Exegesis</button>
-    <button id="reflectBtn">Devotional</button>
-    <button id="verseAskBtn">Ask</button>
-    <button id="selClearBtn" title="Clear selection">&#10005;</button>
+    <button class="lens-btn" id="exegesisBtn"><span class="lens-ltr">E</span><span class="lens-cap">Exegesis</span></button>
+    <button class="lens-btn" id="reflectBtn"><span class="lens-ltr">D</span><span class="lens-cap">Devotional</span></button>
+    <button class="lens-btn" id="verseAskBtn"><span class="lens-ltr">A</span><span class="lens-cap">Ask</span></button>
+    <button class="lens-btn" id="councilBtn"><span class="lens-ltr">C</span><span class="lens-cap">Council</span></button>
+    <button class="lens-btn" id="youthBtn"><span class="lens-ltr">Y</span><span class="lens-cap">Youth</span></button>
+    <button class="lens-btn lens-close" id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
 </div>
@@ -1625,6 +1704,285 @@ $("verseAskBtn").addEventListener("click", () => {
   const { ref, text } = selectedPassage();
   mountVerseAskPanel(ref, text, currentChapter.trans);
 });
+
+/* ================= Council of Voices ================= */
+const HISTORICAL_VOICES = [
+  { name: "Augustine", note: "grace, sin, the restless heart" },
+  { name: "Aquinas", note: "reason and faith, careful distinctions" },
+  { name: "Luther", note: "grace alone, Scripture alone" },
+  { name: "Calvin", note: "God's sovereignty, careful exposition" },
+  { name: "Wesley", note: "grace for all, holiness of life" },
+  { name: "Spurgeon", note: "warm, vivid, pastoral" },
+  { name: "C.S. Lewis", note: "imagination, reason, the ordinary reader" }
+];
+const MODERN_VOICES_MAX = 3;
+
+function getModernVoices() {
+  try { return JSON.parse(localStorage.getItem("bible.modernVoices") || "[]"); } catch (e) { return []; }
+}
+function saveModernVoices(list) {
+  try { localStorage.setItem("bible.modernVoices", JSON.stringify(list)); } catch (e) {}
+}
+
+$("councilBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  mountCouncilPanel();
+});
+
+function mountCouncilPanel() {
+  const { ref, text } = selectedPassage();
+  const old = document.getElementById("exegesisPanel");
+  if (old) old.remove();
+  const panel = document.createElement("div");
+  panel.className = "exegesis-panel";
+  panel.id = "exegesisPanel";
+  const modern = getModernVoices();
+  const histRow = HISTORICAL_VOICES.map(v =>
+    `<button class="council-item" data-voice="${escapeHtml(v.name)}"><span class="cv-name">${escapeHtml(v.name)}</span><span class="cv-note"> \u2014 ${escapeHtml(v.note)}</span></button>`).join("");
+  const modernRows = modern.map((v, i) =>
+    `<div class="council-item-row">
+       <button class="council-item" data-voice="${escapeHtml(v.name)}"><span class="cv-name">${escapeHtml(v.name)}</span>${v.note ? `<span class="cv-note"> \u2014 ${escapeHtml(v.note)}</span>` : ""}${v.level === "Limited" ? ` <span class="cv-flag">caution</span>` : ""}</button>
+       <button class="cv-del" data-i="${i}" title="Remove">\u2715</button>
+     </div>`).join("");
+  const slotsLeft = MODERN_VOICES_MAX - modern.length;
+  const addRow = slotsLeft > 0
+    ? `<button class="council-add" id="councilAddBtn">+ Add a voice <span class="cv-slots">(${slotsLeft} slot${slotsLeft === 1 ? "" : "s"} left)</span></button>`
+    : `<div class="council-full">Modern tier full (${MODERN_VOICES_MAX}). Remove one to add another.</div>`;
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>Council of Voices \u2014 ${escapeHtml(ref)}</span>
+      <div class="ex-tools"><button class="ex-close" title="Close">\u2715</button></div>
+    </div>
+    <div class="ex-body">
+      <p class="council-intro">Choose a voice \u2014 each offers an informed characterization in the spirit of that teacher, not their actual words.</p>
+      <button class="council-item council-auto" data-voice="__auto__"><span class="cv-name">\u2726 Let the Council choose</span><span class="cv-note"> the voice best suited to this verse</span></button>
+      <div class="council-tier">Historical Voices</div>
+      <div class="council-list">${histRow}</div>
+      <div class="council-tier">Modern Voices <span class="cv-count">\u2014 ${modern.length} of ${MODERN_VOICES_MAX}</span></div>
+      <div class="council-list" id="councilModernList">${modernRows}${addRow}</div>
+    </div>`;
+  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  const reader = $("reader");
+  const pager = reader.querySelector(".pager");
+  if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+  panel.querySelectorAll(".council-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const voice = btn.getAttribute("data-voice");
+      runCouncilReading(voice, ref, text);
+    });
+  });
+  panel.querySelectorAll(".cv-del").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = parseInt(btn.getAttribute("data-i"), 10);
+      const list = getModernVoices();
+      list.splice(i, 1);
+      saveModernVoices(list);
+      mountCouncilPanel();
+    });
+  });
+  const addBtn = $("councilAddBtn");
+  if (addBtn) addBtn.addEventListener("click", showAddVoiceForm);
+}
+
+function runCouncilReading(voice, ref, text) {
+  const modern = getModernVoices();
+  let voiceName = voice, level = null, isAuto = (voice === "__auto__");
+  if (!isAuto) {
+    const m = modern.find(v => v.name === voice);
+    if (m) level = m.level;
+  }
+  const cautionNote = (level === "Limited")
+    ? `\n\nIMPORTANT: There is limited documented material on this teacher. If you cannot credibly characterize their specific theological approach, say so honestly at the start rather than inventing a voice.`
+    : "";
+  const voiceInstruction = isAuto
+    ? `Choose the single theologian or teacher from the Christian tradition whose thought most illuminates this passage, name them, and give their reading.`
+    : `Give the reading of ${voiceName}.`;
+  const prompt = `A reader of a Bible study app has selected a passage and wishes to hear how a particular teacher of Scripture would illuminate it, as part of the "Council of Voices" \u2014 a study feature offering the wisdom of the Christian interpretive tradition.
+
+Passage: ${ref} (${currentChapter.trans})
+${text}
+
+${voiceInstruction}
+
+Essential rules:
+- Offer an INFORMED CHARACTERIZATION in the spirit of this teacher's known theology, emphases, and characteristic concerns \u2014 NEVER fabricated direct quotations. Do not put invented words in their mouth or present fictional quotes as real. You may describe how they characteristically approached Scripture and what they would likely emphasize here.
+- Ground the reading in this teacher's actual, documented theological outlook.
+- If the chosen figure is not genuinely a teacher of Scripture, theologian, or preacher whose views are documented, say so honestly instead of inventing.
+- Write 2\u20134 warm, substantive paragraphs in flowing prose \u2014 no headers. Let their distinctive emphases come through.
+- Begin directly with the reading (you may name the figure in the first line if helpful).${cautionNote}`;
+  const title = isAuto ? `Council \u2014 ${ref}` : `${voiceName} \u2014 ${ref}`;
+  streamLens({
+    title, prompt, structured: false,
+    metaOverride: { title, label: "Council of Voices", trans: currentChapter.trans }
+  });
+  // Add the honesty subnote under the header once the panel mounts
+  setTimeout(() => {
+    const p = document.getElementById("exegesisPanel");
+    if (p && !p.querySelector(".voice-subnote")) {
+      const body = p.querySelector(".ex-body");
+      const note = document.createElement("p");
+      note.className = "voice-subnote";
+      note.textContent = isAuto
+        ? "An informed characterization in the spirit of the chosen teacher's theology \u2014 not their actual words."
+        : `An informed characterization in the spirit of ${voiceName}'s theology \u2014 not their actual words.`;
+      if (body && body.firstChild) body.insertBefore(note, body.firstChild);
+    }
+  }, 60);
+}
+
+function showAddVoiceForm() {
+  const list = $("councilModernList");
+  if (!list) return;
+  list.innerHTML = `
+    <div class="add-voice">
+      <div class="add-voice-head">Add a modern voice</div>
+      <div class="ask-row">
+        <textarea id="addVoiceInput" rows="1" placeholder="Name of a Bible teacher, theologian, or preacher"></textarea>
+        <button class="ask-begin" id="addVoiceAssess">Assess</button>
+      </div>
+      <div id="addVoiceResult"></div>
+    </div>`;
+  const input = $("addVoiceInput");
+  input.focus();
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); assessVoice(); }
+  });
+  $("addVoiceAssess").addEventListener("click", assessVoice);
+}
+
+async function assessVoice() {
+  const input = $("addVoiceInput");
+  const name = input ? input.value.trim() : "";
+  if (!name) { if (input) input.focus(); return; }
+  const key = ensureApiKey();
+  if (!key) return;
+  const result = $("addVoiceResult");
+  result.innerHTML = `<div class="av-assessing"><span class="ex-spinner"></span> Assessing\u2026</div>`;
+
+  const prompt = `You are assessing whether an AI Bible study app can credibly characterize the theological voice of a named person, for a feature that offers "an informed characterization in the spirit of a teacher's theology."
+
+Name entered: "${name}"
+
+Respond with ONLY a JSON object (no markdown, no backticks) in this exact shape:
+{"isTeacher": true/false, "canonicalName": "properly spelled name", "level": "Strong"|"Moderate"|"Limited", "note": "a 3-6 word descriptor of their emphases", "reason": "one honest sentence explaining the grounding level"}
+
+Rules:
+- "isTeacher" is true only if this is a real Bible teacher, theologian, preacher, or Christian thinker whose theological views are documented. If they are not (e.g. a pop singer, a fictional character, a random name), set isTeacher false and briefly say why in "reason".
+- "level": "Strong" if there is substantial documented theology to characterize; "Moderate" if their general tradition is known but specifics are sparse; "Limited" if there is little reliable material specific to them.
+- "canonicalName": the correct, properly-spelled form of the name.
+- Be honest and conservative. Do not inflate the level.`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: EXEGESIS_MODEL, max_tokens: 400, messages: [{ role: "user", content: prompt }] })
+    });
+    if (!res.ok) { result.innerHTML = `<p class="ex-status">Assessment failed (HTTP ${res.status}). Try again.</p>`; return; }
+    const data = await res.json();
+    let txt = (data.content || []).map(b => b.text || "").join("").trim();
+    txt = txt.replace(/^```json\s*/i, "").replace(/```$/,"").trim();
+    let a;
+    try { a = JSON.parse(txt); } catch (e) { result.innerHTML = `<p class="ex-status">Couldn't read the assessment. Try again.</p>`; return; }
+
+    if (!a.isTeacher) {
+      result.innerHTML = `<div class="av-box av-no"><div class="av-title">Not a teacher of Scripture</div><div class="av-reason">${escapeHtml(a.reason || "This doesn't appear to be a Bible teacher or theologian.")}</div></div>`;
+      return;
+    }
+    const lvl = a.level || "Moderate";
+    const cls = lvl === "Strong" ? "av-strong" : (lvl === "Limited" ? "av-limited" : "av-moderate");
+    const icon = lvl === "Strong" ? "\u2713" : (lvl === "Limited" ? "\u26A0" : "\u25D0");
+    const cautionExtra = lvl === "Limited" ? " You can still add them, but the reading will carry a caution." : "";
+    result.innerHTML = `
+      <div class="av-box ${cls}">
+        <div class="av-title">${icon} ${escapeHtml(lvl)} grounding</div>
+        <div class="av-reason">${escapeHtml(a.reason || "")}${cautionExtra}</div>
+      </div>
+      <div class="av-actions">
+        <button class="av-cancel" id="avCancel">Cancel</button>
+        <button class="av-add" id="avAdd">Add to Council</button>
+      </div>`;
+    $("avCancel").addEventListener("click", mountCouncilPanel);
+    $("avAdd").addEventListener("click", () => {
+      const list = getModernVoices();
+      if (list.length >= MODERN_VOICES_MAX) { mountCouncilPanel(); return; }
+      list.push({ name: a.canonicalName || name, note: a.note || "", level: lvl });
+      saveModernVoices(list);
+      mountCouncilPanel();
+    });
+  } catch (err) {
+    result.innerHTML = `<p class="ex-status">Couldn't reach the API (${escapeHtml(err.message)}).</p>`;
+  }
+}
+
+/* ================= Youth lens ================= */
+const YOUTH_BANDS = [
+  { key: "children", label: "Children", range: "0\u20139" },
+  { key: "preteens", label: "Pre-Teens", range: "10\u201312" },
+  { key: "youngteens", label: "Young Teens", range: "13\u201315" },
+  { key: "olderteens", label: "Older Teens", range: "16\u201318" },
+  { key: "youngadults", label: "Young Adults", range: "19\u201324" }
+];
+
+$("youthBtn").addEventListener("click", () => {
+  if (!currentChapter || !chapterVerses || !selRange()) return;
+  mountYouthPanel();
+});
+
+function mountYouthPanel() {
+  const { ref, text } = selectedPassage();
+  const old = document.getElementById("exegesisPanel");
+  if (old) old.remove();
+  const panel = document.createElement("div");
+  panel.className = "exegesis-panel";
+  panel.id = "exegesisPanel";
+  const bands = YOUTH_BANDS.map(b =>
+    `<button class="youth-band" data-band="${b.key}">${b.label} <span class="yb-range">\u00B7 ${b.range}</span></button>`).join("");
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>Youth \u2014 ${escapeHtml(ref)}</span>
+      <div class="ex-tools"><button class="ex-close" title="Close">\u2715</button></div>
+    </div>
+    <div class="ex-body">
+      <p class="council-intro">For which age? The explanation, example, and takeaway are shaped to fit.</p>
+      <div class="youth-bands">${bands}</div>
+    </div>`;
+  panel.querySelector(".ex-close").addEventListener("click", () => panel.remove());
+  const reader = $("reader");
+  const pager = reader.querySelector(".pager");
+  if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  panel.querySelectorAll(".youth-band").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const band = YOUTH_BANDS.find(b => b.key === btn.getAttribute("data-band"));
+      runYouthReading(band, ref, text);
+    });
+  });
+}
+
+function runYouthReading(band, ref, text) {
+  const prompt = `A Sunday School teacher or parent wants to teach this passage to young people in the "${band.label}" age range (ages ${band.range}). Produce a teacher's toolkit, tailored precisely to this age.
+
+Passage: ${ref} (${currentChapter.trans})
+${text}
+
+Give exactly these four short sections, each with its heading in bold on its own line, tuned to ages ${band.range} in vocabulary, examples, and depth:
+
+**The simple idea** \u2014 the heart of the passage in language right for this age (very simple for young children; more substantive for older ranges).
+**Picture this** \u2014 a concrete analogy, object lesson, or example that will land for this age group.
+**Ask them** \u2014 one or two discussion questions to open the passage up for this age.
+**Take it home** \u2014 a single memorable takeaway sentence they can carry.
+
+Keep it warm and faithful to the text. For the youngest, be very concrete and brief; for young adults, allow real theological substance. Do not add other sections or preamble.`;
+  const title = `Youth \u00B7 ${band.label} ${band.range} \u2014 ${ref}`;
+  streamLens({
+    title, prompt, structured: false,
+    metaOverride: { title, label: `Youth (${band.label})`, trans: currentChapter.trans }
+  });
+}
 
 /* Inline Ask panel below the chapter (mirrors the Exegesis/Devotional pattern,
    styled like the "Ask a Bible Question" card) */
