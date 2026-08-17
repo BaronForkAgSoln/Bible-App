@@ -87,6 +87,18 @@
   #readView { padding: 1.4rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 46rem; margin: 0 auto; }
   .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
   .settings-wrap { position: relative; }
+  .to-top {
+    position: fixed; right: 1rem; bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+    display: inline-flex; align-items: center; gap: 0.3rem; z-index: 25;
+    font-family: var(--sans); font-size: 0.8rem; font-weight: 500;
+    background: var(--ink); color: var(--paper); border: none; border-radius: 20px;
+    padding: 0.55rem 0.9rem; box-shadow: 0 4px 14px rgba(28,27,26,0.28); cursor: pointer;
+    opacity: 0.9;
+  }
+  .to-top[hidden] { display: none; }
+  .to-top:hover { opacity: 1; }
+  .to-top:active { background: var(--rubric); }
+  .to-top .tt-label { font-size: 0.78rem; }
   .settings-menu {
     position: absolute; right: 0; top: calc(100% + 4px);
     background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
@@ -743,6 +755,7 @@
     <button class="lens-btn lens-close" id="selClearBtn" title="Clear selection">&#10005;</button>
   </div>
   <div class="toast" id="toast" hidden></div>
+  <button class="to-top" id="toTopBtn" title="Back to top" hidden>&#8593;<span class="tt-label">Top</span></button>
 </div>
 
 <script>
@@ -1735,6 +1748,11 @@ const MODERN_VOICES_MAX = 3;
 function getModernVoices() {
   try { return JSON.parse(localStorage.getItem("bible.modernVoices") || "[]"); } catch (e) { return []; }
 }
+function councilRoster() {
+  const hist = HISTORICAL_VOICES.map(v => v.name);
+  const modern = getModernVoices().map(v => v.name);
+  return hist.concat(modern).join(", ");
+}
 function saveModernVoices(list) {
   try { localStorage.setItem("bible.modernVoices", JSON.stringify(list)); } catch (e) {}
 }
@@ -1814,7 +1832,7 @@ function runCouncilReading(voice, ref, text) {
     ? `\n\nIMPORTANT: There is limited documented material on this teacher. If you cannot credibly characterize their specific theological approach, say so honestly at the start rather than inventing a voice.`
     : "";
   const voiceInstruction = isAuto
-    ? `Choose the single theologian or teacher from the Christian tradition whose thought most illuminates this passage, name them, and give their reading.`
+    ? `The Council currently seats these voices: ${councilRoster()}.\nFrom this list ONLY, choose the single voice whose thought most illuminates this passage. Name the one you chose at the start, then give their reading. Do not choose anyone who is not on this list.`
     : `Give the reading of ${voiceName}.`;
   const prompt = `A reader of a Bible study app has selected a passage and wishes to hear how a particular teacher of Scripture would illuminate it, as part of the "Council of Voices" \u2014 a study feature offering the wisdom of the Christian interpretive tradition.
 
@@ -2274,6 +2292,22 @@ function wireSizeButtons() {
   if (u) u.addEventListener("click", () => { if (sizeIdx < SIZES.length - 1) { sizeIdx++; applySize(); } });
   applySize();
 }
+
+/* Back-to-top: appears on the reading view once scrolled down a bit */
+(function () {
+  const btn = $("toTopBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  function update() {
+    const rv = $("readView");
+    const onRead = rv && rv.classList.contains("show");
+    btn.hidden = !(onRead && window.scrollY > 600);
+  }
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  document.addEventListener("click", () => setTimeout(update, 60));
+  update();
+})();
 
 $("backBtn").addEventListener("click", () => {
   stopContinuous();
