@@ -504,6 +504,65 @@
   .verse-ask-card { background: none; border-left: none; border-radius: 0; padding: 0; }
   .verse-ask-card .ask-q { font-size: 1.15rem; margin: 0 0 0.15rem; }
 
+  /* ---------- Ask clear box + two-button fork ---------- */
+  .ask-input-wrap { position: relative; }
+  .ask-input-wrap textarea { width: 100%; padding-right: 2.2rem; }
+  .ask-clear {
+    position: absolute; top: 0.5rem; right: 0.5rem;
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    font-size: 0.9rem; padding: 0.2rem 0.35rem; border-radius: 4px; line-height: 1;
+  }
+  .ask-clear[hidden] { display: none; }
+  .ask-clear:hover { color: var(--rubric); background: var(--hover); }
+  .ask-choice { display: flex; gap: 0.6rem; margin-top: 0.7rem; }
+  .ask-choice-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+    border-radius: 7px; padding: 0.65rem 0.5rem; cursor: pointer; border: 1px solid var(--rubric);
+  }
+  .ask-choice-btn.quick { background: none; }
+  .ask-choice-btn.quick .acb-title { color: var(--rubric); }
+  .ask-choice-btn.quick .acb-cap { color: var(--muted); }
+  .ask-choice-btn.quick:active { background: #F5E6E6; }
+  .ask-choice-btn.deep { background: var(--rubric); border-color: var(--rubric); }
+  .ask-choice-btn.deep .acb-title { color: var(--paper); }
+  .ask-choice-btn.deep .acb-cap { color: #F0C9C9; }
+  .ask-choice-btn.deep:active { background: #762727; }
+  .acb-title { font-family: var(--sans); font-size: 0.9rem; font-weight: 600; }
+  .acb-cap { font-family: var(--sans); font-size: 0.64rem; }
+
+  /* ---------- Illumination screen ---------- */
+  .illum-loading { text-align: center; padding: 2.5rem 1rem; }
+  .illum-loading .ex-spinner { margin: 0 auto 1rem; width: 26px; height: 26px; }
+  .illum-loading-text { font-family: var(--serif); font-size: 1.1rem; color: var(--ink); }
+  .illum-loading-sub { font-family: var(--sans); font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+  .illum-card {
+    background: #F8F5F0; border-left: 3px solid var(--rubric); border-radius: 0 8px 8px 0;
+    padding: 1.5rem 1.4rem 1.3rem; max-width: 34rem;
+  }
+  .illum-tag {
+    font-family: var(--sans); font-size: 0.62rem; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--rubric); margin-bottom: 0.25rem;
+  }
+  .illum-title { font-family: var(--serif); font-size: 1.4rem; color: var(--ink); line-height: 1.25; }
+  .illum-meta { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; margin-bottom: 1.4rem; }
+  .illum-listen { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; margin-bottom: 1.3rem; }
+  .illum-play {
+    width: 88px; height: 88px; border-radius: 50%; border: none; background: var(--rubric);
+    color: var(--paper); font-size: 2.1rem; cursor: pointer; box-shadow: 0 4px 18px rgba(140,47,47,0.32);
+    display: flex; align-items: center; justify-content: center; padding-left: 0.25rem;
+  }
+  .illum-play:active { background: #762727; }
+  .illum-listen-label { font-family: var(--sans); font-size: 0.82rem; letter-spacing: 0.06em; color: var(--rubric); font-weight: 500; }
+  .illum-secondary { text-align: center; border-top: 1px solid #E0D9CF; padding-top: 0.9rem; }
+  .illum-readlink { background: none; border: none; cursor: pointer; font-family: var(--sans); font-size: 0.76rem; color: var(--rubric); border-bottom: 1px solid #D8B4B4; padding: 0 0 1px; }
+  .illum-readlink:hover { color: var(--ink); }
+  .illum-text { margin-top: 1.2rem; }
+  .illum-text p { font-family: var(--serif); font-size: 1.05rem; line-height: 1.75; color: var(--ink); margin: 0 0 1rem; }
+  .illum-save-row { text-align: center; margin-top: 0.9rem; }
+  .illum-save { background: none; border: none; cursor: pointer; font-family: var(--sans); font-size: 0.72rem; color: #9a958c; }
+  .illum-save:hover { color: var(--rubric); }
+  .link-btn { background: none; border: none; color: var(--rubric); cursor: pointer; text-decoration: underline; font: inherit; }
+
   /* ---------- Council of Voices & Youth ---------- */
   .council-intro { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: 0 0 0.9rem; line-height: 1.5; }
   .council-tier {
@@ -2184,18 +2243,32 @@ function showAsk(seedContext, verseCtx) {
       <p class="ask-q">What would you like to ask?</p>
       <p class="ask-sub">Anything about Scripture \u2014 a passage, a person, a word, a theme, a difference between traditions.</p>
       ${ctxChip}
-      <div class="ask-row">
+      <div class="ask-input-wrap">
         <textarea id="askInput" rows="1" placeholder=""></textarea>
-        <button class="ask-begin" id="askGo">Ask</button>
+        <button class="ask-clear" id="askClear" title="Clear" hidden>\u2715</button>
+      </div>
+      <div class="ask-choice">
+        <button class="ask-choice-btn quick" id="askGo">
+          <span class="acb-title">Quick Answer</span><span class="acb-cap">a written reply</span>
+        </button>
+        <button class="ask-choice-btn deep" id="askIllumine">
+          <span class="acb-title">Deeper Illumination</span><span class="acb-cap">a spoken treatment</span>
+        </button>
       </div>
       <div class="ask-recent" id="askRecent"></div>
     </div>`;
   const input = $("askInput");
-  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
+  const clearBtn = $("askClear");
+  const syncClear = () => { if (clearBtn) clearBtn.hidden = !input.value.trim(); };
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; syncClear(); });
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runAsk(); }
   });
+  if (clearBtn) clearBtn.addEventListener("click", () => {
+    input.value = ""; input.style.height = "auto"; syncClear(); input.focus();
+  });
   $("askGo").addEventListener("click", runAsk);
+  $("askIllumine").addEventListener("click", runIllumination);
   const ctxClear = $("askCtxClear");
   if (ctxClear) ctxClear.addEventListener("click", () => { askVerseContext = null; showAsk(); });
   renderRecent();
@@ -2203,9 +2276,9 @@ function showAsk(seedContext, verseCtx) {
   showView("askView");
   if (seedContext && typeof seedContext === "string") {
     input.value = seedContext;
-    setTimeout(() => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; }, 0);
+    setTimeout(() => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; syncClear(); }, 0);
   }
-  setTimeout(() => { input.focus(); const n = input.value.length; input.setSelectionRange(n, n); }, 50);
+  setTimeout(() => { input.focus(); const n = input.value.length; input.setSelectionRange(n, n); syncClear(); }, 50);
 }
 
 function buildAskPrompt(question, verseCtx) {
@@ -2257,6 +2330,7 @@ function runAsk() {
 
 $("askBtn").addEventListener("click", () => { askReturn = null; showAsk(); });
 $("askBackBtn").addEventListener("click", () => {
+  ttsStop(); illumReading = false;
   $("askReader").innerHTML = "";
   if (askReturn) {
     const r = askReturn; askReturn = null;
@@ -2269,6 +2343,145 @@ $("askBackBtn").addEventListener("click", () => {
 function updateAskBackLabel() {
   const b = $("askBackBtn");
   if (b) b.innerHTML = askReturn ? `&larr; ${escapeHtml(askReturn.label)}` : "&larr; Books";
+}
+
+/* ================= Illumination (deeper, spoken treatment) ================= */
+function buildIlluminationPrompt(topic) {
+  const trans = currentTransName();
+  return `A listener has requested an "Illumination" \u2014 a developed, spoken treatment of a topic from Scripture, meant to be HEARD (listened to), about fifteen to twenty minutes long when read aloud (roughly 2,200\u20132,800 words).
+
+Their topic or question:
+"${topic}"
+
+Write it as a warm, faithful, spoken address \u2014 as a gifted Bible teacher would deliver it aloud to a listener who wants to sit with this topic.
+
+THEOLOGICAL HOME \u2014 important:
+- Teach from historic Protestant, Reformation conviction: Scripture as the final authority (sola scriptura), justification by grace alone through faith alone (sola gratia, sola fide), Christ alone, to the glory of God alone. Let these be the water the teaching swims in, not slogans to recite.
+- You may draw freely and gratefully on the whole breadth of the Christian tradition \u2014 Augustine and the Church Fathers, the great expositors and Reformers \u2014 but always from this Protestant center of gravity, with Scripture as the final word.
+- Be gracious about genuine intramural Protestant differences (mode of baptism, end-times, church government, and the like) rather than pressing one sub-tradition's position as the only faithful one.
+- Do NOT frame anything in contemporary political, cultural, or partisan terms. This is timeless doctrine and devotion, not a modern identity or a culture-war posture. Stay entirely on Scripture and the historic faith.
+
+HOW TO WRITE IT:
+- It is meant to be HEARD, so write for the ear: flowing spoken prose, natural cadence, gentle repetition where it aids the listener, clear movement from one thought to the next. No headers, no bullet points, no section labels \u2014 let it flow as continuous spoken teaching.
+- Give it a real arc: draw the listener in, develop the topic through Scripture with substance, illustrate concretely, and move toward heart application and a closing word that lands.
+- Let the BIBLE do the heavy lifting: quote Scripture generously (briefly, from the ${trans} where a quotation carries weight) and let the text itself carry the comfort and the teaching, rather than leaning on your own eloquence or extrapolation.
+- Never attribute invented quotations to real preachers or figures. If you reference a teacher, characterize their known emphasis; do not fabricate words they did not say.
+- Warm, reverent, personal \u2014 spoken to one listener, not a crowd. Do not begin with filler like "Today we're going to talk about." Begin as a teacher who has something worth hearing.
+
+IF THE TOPIC IS TENDER (suffering, grief, fear, doubt, loss, despair):
+- Lead with Scripture and the presence of God, not with tidy answers or formulas. Do not over-promise (avoid "God will heal you" or "everything will work out"). Hold space for lament as the Psalms do.
+- Somewhere near the close, gently remind the listener that this reflection is no substitute for their pastor, their church, and the people who love them \u2014 and encourage them toward that real community.
+- If the topic signals genuine crisis or danger to the listener's life, do not deliver a sermon: respond briefly and warmly, urge them to reach out immediately to a trusted person, their pastor, or a crisis line, and stop there.
+
+If the topic is too narrow or thin to sustain a full spoken treatment (for example, a one-word definition), do not pad it \u2014 give a shorter, honest reflection of a few minutes and note gently at the start that this is a brief reflection rather than a full Illumination.
+
+Scope: This is for understanding the Bible and the Christian faith. If the topic is outside that (general knowledge, unrelated tasks, current events), warmly decline and say the Illumination is for the Scripture and the faith.
+
+Write only the spoken address itself. Do not add a title or any preamble about what you are doing.`;
+}
+
+async function runIllumination() {
+  const input = $("askInput");
+  const topic = input ? input.value.trim() : "";
+  if (!topic) { if (input) input.focus(); return; }
+  saveRecentQuestion(topic);
+  askShowAll = false;
+  const key = ensureApiKey();
+  if (!key) return;
+  const card = $("askCard");
+  if (card) card.remove();
+
+  const el = $("askReader");
+  el.innerHTML = `
+    <div class="illum-loading">
+      <div class="ex-spinner"></div>
+      <div class="illum-loading-text">Preparing your Illumination\u2026</div>
+      <div class="illum-loading-sub">A spoken treatment takes a moment to compose.</div>
+    </div>`;
+
+  const prompt = buildIlluminationPrompt(topic);
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: EXEGESIS_MODEL, max_tokens: 8000, messages: [{ role: "user", content: prompt }] })
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const e = await res.json(); if (e.error && e.error.message) msg = e.error.message; } catch (e) {}
+      el.innerHTML = `<p class="ex-status">Couldn't compose the Illumination (${escapeHtml(msg)}). <button class="link-btn" onclick="showAsk()">Back</button></p>`;
+      return;
+    }
+    const data = await res.json();
+    const text = (data.content || []).map(b => b.text || "").join("").trim();
+    if (!text) { el.innerHTML = `<p class="ex-status">Nothing came back \u2014 try again.</p>`; return; }
+    showIllumination(topic, text);
+  } catch (err) {
+    el.innerHTML = `<p class="ex-status">Couldn't reach the API (${escapeHtml(err.message)}). <button class="link-btn" onclick="showAsk()">Back</button></p>`;
+  }
+}
+
+function estIllumMinutes(text) {
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return Math.max(3, Math.round(words / 150));  // ~150 wpm spoken
+}
+
+let illumReading = false;
+function showIllumination(topic, text) {
+  const el = $("askReader");
+  const mins = estIllumMinutes(text);
+  const title = topic.length > 70 ? topic.slice(0, 68) + "\u2026" : topic;
+  el.innerHTML = `
+    <div class="illum-card">
+      <div class="illum-tag">Illumination</div>
+      <div class="illum-title">${escapeHtml(title)}</div>
+      <div class="illum-meta">About ${mins} minutes</div>
+      <div class="illum-listen">
+        <button class="illum-play" id="illumPlay" title="Listen">&#9654;</button>
+        <div class="illum-listen-label" id="illumPlayLabel">Listen</div>
+      </div>
+      <div class="illum-secondary">
+        <button class="illum-readlink" id="illumReadToggle">Read the text instead</button>
+      </div>
+      <div class="illum-text" id="illumText" hidden></div>
+    </div>
+    <div class="illum-save-row"><button class="illum-save" id="illumSave">Save a copy</button></div>`;
+
+  const playBtn = $("illumPlay");
+  const playLabel = $("illumPlayLabel");
+  playBtn.addEventListener("click", () => {
+    if (illumReading) {
+      ttsStop(); illumReading = false;
+      playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Listen";
+      return;
+    }
+    // chunk into sentences/paragraphs for smooth speaking
+    const chunks = text.split(/\n\s*\n/).flatMap(p => p.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]*/g) || []).map(s => s.trim()).filter(Boolean);
+    illumReading = true;
+    playBtn.innerHTML = "\u25A0"; playLabel.textContent = "Stop";
+    ttsController = ttsSpeak(chunks, null, () => {
+      illumReading = false; playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Listen"; ttsController = null;
+    });
+  });
+
+  $("illumReadToggle").addEventListener("click", () => {
+    const t = $("illumText");
+    if (t.hidden) {
+      t.innerHTML = text.split(/\n\s*\n/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join("");
+      t.hidden = false;
+      $("illumReadToggle").textContent = "Hide the text";
+    } else {
+      t.hidden = true;
+      $("illumReadToggle").textContent = "Read the text instead";
+    }
+  });
+
+  $("illumSave").addEventListener("click", () => {
+    const payload = `Illumination \u2014 ${topic}\n\n${text}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(payload).then(() => showToast("Illumination copied")).catch(() => window.prompt("Copy:", payload));
+    } else { window.prompt("Copy:", payload); }
+  });
 }
 
 
