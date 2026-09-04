@@ -1423,7 +1423,7 @@ function ensureApiKey() {
   let k = getApiKey();
   if (!k) {
     k = (window.prompt(
-      "Paste your Anthropic API key (starts with sk-ant-).\nIt is stored only in this browser on this device \u2014 use the \uD83D\uDD11 button to change or remove it.", ""
+      "Paste your Anthropic API key (starts with sk-ant-).\nIt is stored only in this browser on this device \u2014 to change or remove it later, open Settings (the \u2699 gear, top right) and choose API key.", ""
     ) || "").trim();
     if (k) saveApiKey(k);
   }
@@ -1478,7 +1478,7 @@ $("voiceBtn").addEventListener("click", () => {
 
 $("keyBtn").addEventListener("click", () => {
   const entry = window.prompt(
-    "Anthropic API key for exegesis:\n(Clear the box and press OK to remove it from this device.)",
+    "Anthropic API key \u2014 powers the AI study features (Exegesis, Ask, Council, Illumination, and more).\n(Clear the box and press OK to remove it from this device.)",
     getApiKey()
   );
   if (entry === null) return;
