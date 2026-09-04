@@ -517,16 +517,13 @@
   .ask-choice { display: flex; gap: 0.6rem; margin-top: 0.7rem; }
   .ask-choice-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
-    border-radius: 7px; padding: 0.65rem 0.5rem; cursor: pointer; border: 1px solid var(--rubric);
+    border-radius: 7px; padding: 0.65rem 0.5rem; cursor: pointer;
+    border: 1px solid var(--rubric); background: none;
   }
-  .ask-choice-btn.quick { background: none; }
-  .ask-choice-btn.quick .acb-title { color: var(--rubric); }
-  .ask-choice-btn.quick .acb-cap { color: var(--muted); }
-  .ask-choice-btn.quick:active { background: #F5E6E6; }
-  .ask-choice-btn.deep { background: var(--rubric); border-color: var(--rubric); }
-  .ask-choice-btn.deep .acb-title { color: var(--paper); }
-  .ask-choice-btn.deep .acb-cap { color: #F0C9C9; }
-  .ask-choice-btn.deep:active { background: #762727; }
+  .ask-choice-btn .acb-title { color: var(--rubric); }
+  .ask-choice-btn .acb-cap { color: var(--muted); }
+  .ask-choice-btn:hover { background: var(--hover); }
+  .ask-choice-btn:active { background: #F5E6E6; }
   .acb-title { font-family: var(--sans); font-size: 0.9rem; font-weight: 600; }
   .acb-cap { font-family: var(--sans); font-size: 0.64rem; }
 
