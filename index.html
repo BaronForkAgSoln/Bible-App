@@ -769,7 +769,6 @@
       <div class="settings-menu" id="settingsMenu" hidden>
         <div class="settings-menu-head">Settings</div>
         <button class="settings-item" id="voiceBtn">&#127908;&nbsp; Reading voice</button>
-        <button class="settings-item" id="keyBtn">&#128273;&nbsp; API key</button>
       </div>
     </div>
   </div>
@@ -1412,23 +1411,31 @@ function updateListenBar() {
   if (sl) { sl.classList.toggle("on", !!sleepTimer); sl.textContent = sleepTimer ? "Sleep timer on" : "Sleep in 20 min"; }
 }
 
-/* ---------- Anthropic API key (yours, stored only in this browser) ---------- */
-function getApiKey() {
-  try { return localStorage.getItem("bible.anthropicKey") || ""; } catch (e) { return ""; }
+/* ---------- AI backend: gated Cloudflare Worker proxy ----------
+   The Anthropic API key now lives server-side in the Worker, not on the
+   device. The app calls the Worker with a shared gate passphrase; the
+   Worker checks the gate + origin, adds the key, and forwards to Anthropic.
+   Family members need no key and no setup. */
+const AI_PROXY_URL = "https://bible-app-proxy.jmb1257.workers.dev";
+const AI_PROXY_GATE = "HWoq81vIAu8fuOTylq3VZycv";
+
+/* Call the AI proxy. Returns a fetch Response (streaming body intact). */
+function aiFetch(payloadObj) {
+  return fetch(AI_PROXY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-App-Gate": AI_PROXY_GATE,
+    },
+    body: JSON.stringify(payloadObj),
+  });
 }
-function saveApiKey(k) {
-  try { localStorage.setItem("bible.anthropicKey", k); } catch (e) {}
-}
-function ensureApiKey() {
-  let k = getApiKey();
-  if (!k) {
-    k = (window.prompt(
-      "Paste your Anthropic API key (starts with sk-ant-).\nIt is stored only in this browser on this device \u2014 to change or remove it later, open Settings (the \u2699 gear, top right) and choose API key.", ""
-    ) || "").trim();
-    if (k) saveApiKey(k);
-  }
-  return k;
-}
+
+/* Legacy helpers kept as harmless no-ops so existing call sites still work.
+   There is no longer a per-device key to enter. */
+function getApiKey() { return "proxy"; }
+function ensureApiKey() { return "proxy"; }
+function saveApiKey() {}
 $("settingsBtn").addEventListener("click", (e) => {
   e.stopPropagation();
   const menu = $("settingsMenu");
@@ -1439,7 +1446,7 @@ document.addEventListener("click", (e) => {
   if (menu && !menu.hidden && !e.target.closest(".settings-wrap")) menu.hidden = true;
 });
 // Close the menu after choosing any item
-["voiceBtn", "keyBtn"].forEach(id => {
+["voiceBtn"].forEach(id => {
   const b = $(id);
   if (b) b.addEventListener("click", () => { const m = $("settingsMenu"); if (m) m.hidden = true; });
 });
@@ -1474,15 +1481,6 @@ $("voiceBtn").addEventListener("click", () => {
   });
   document.getElementById("voiceDone").addEventListener("click", () => { ttsSaveVoiceName(sel.value); ttsStop(); ov.remove(); });
   ov.addEventListener("click", (e) => { if (e.target === ov) { ttsStop(); ov.remove(); } });
-});
-
-$("keyBtn").addEventListener("click", () => {
-  const entry = window.prompt(
-    "Anthropic API key \u2014 powers the AI study features (Exegesis, Ask, Council, Illumination, and more).\n(Clear the box and press OK to remove it from this device.)",
-    getApiKey()
-  );
-  if (entry === null) return;
-  saveApiKey(entry.trim());
 });
 
 /* ---------- Minimal markdown rendering for the exegesis text ---------- */
@@ -1577,8 +1575,6 @@ function renderStructured(src, openState, sectionsOut) {
 }
 
 async function streamLens({ title, prompt, structured, target, metaOverride }) {
-  const key = ensureApiKey();
-  if (!key) return;
   const panel = mountExegesisPanel(title, !structured, target);
   const body = panel.querySelector(".ex-body");
   const meta = metaOverride || {
@@ -1618,29 +1614,19 @@ async function streamLens({ title, prompt, structured, target, metaOverride }) {
   let streamStarted = false;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
+    const res = await aiFetch({
         model: EXEGESIS_MODEL,
         max_tokens: 3000,
         stream: true,
         messages: [{ role: "user", content: prompt }]
-      })
     });
 
     if (!res.ok) {
       clearInterval(waitTimer);
       let msg = `HTTP ${res.status}`;
       try { const j = await res.json(); msg = (j.error && j.error.message) || msg; } catch (e) {}
-      if (res.status === 401 || res.status === 403) {
-        saveApiKey("");
-        msg += " \u2014 the stored key was cleared; tap \uD83D\uDD11 to enter it again.";
+      if (res.status === 403) {
+        msg = "This app couldn't reach the study service. If you're opening it from an unexpected address, use the official link.";
       }
       body.innerHTML = `<p class="ex-status">Couldn't run this: ${escapeHtml(msg)}</p>`;
       return;
@@ -1952,8 +1938,6 @@ async function assessVoice() {
   const input = $("addVoiceInput");
   const name = input ? input.value.trim() : "";
   if (!name) { if (input) input.focus(); return; }
-  const key = ensureApiKey();
-  if (!key) return;
   const result = $("addVoiceResult");
   result.innerHTML = `<div class="av-assessing"><span class="ex-spinner"></span> Assessing\u2026</div>`;
 
@@ -1971,11 +1955,7 @@ Rules:
 - Be honest and conservative. Do not inflate the level.`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: EXEGESIS_MODEL, max_tokens: 400, messages: [{ role: "user", content: prompt }] })
-    });
+    const res = await aiFetch({ model: EXEGESIS_MODEL, max_tokens: 400, messages: [{ role: "user", content: prompt }] });
     if (!res.ok) { result.innerHTML = `<p class="ex-status">Assessment failed (HTTP ${res.status}). Try again.</p>`; return; }
     const data = await res.json();
     let txt = (data.content || []).map(b => b.text || "").join("").trim();
@@ -2383,8 +2363,6 @@ async function runIllumination() {
   if (!topic) { if (input) input.focus(); return; }
   saveRecentQuestion(topic);
   askShowAll = false;
-  const key = ensureApiKey();
-  if (!key) return;
   const card = $("askCard");
   if (card) card.remove();
 
@@ -2398,11 +2376,7 @@ async function runIllumination() {
 
   const prompt = buildIlluminationPrompt(topic);
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: EXEGESIS_MODEL, max_tokens: 8000, messages: [{ role: "user", content: prompt }] })
-    });
+    const res = await aiFetch({ model: EXEGESIS_MODEL, max_tokens: 8000, messages: [{ role: "user", content: prompt }] });
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try { const e = await res.json(); if (e.error && e.error.message) msg = e.error.message; } catch (e) {}
