@@ -89,14 +89,10 @@
   .book-overview-btn { margin-left: auto; align-self: center; }
   .book-overview-btn[hidden] { display: none; }
   .verse-quote {
-    margin: 0 1.1rem 0.2rem; padding: 0.7rem 0 0.7rem 0.9rem;
-    border-left: 2px solid var(--rubric);
+    margin: 0 1.1rem 0.3rem; padding: 0.5rem 0 0.6rem;
   }
   .verse-quote .vq-text { font-family: var(--serif); font-style: italic; font-size: 1.02rem; line-height: 1.6; color: var(--ink); }
-  .verse-quote .vq-ref {
-    font-family: var(--sans); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--muted); margin-top: 0.35rem;
-  }
+  .verse-quote .vq-ref { display: none; }
   .settings-wrap { position: relative; }
   .to-top {
     position: fixed; right: 1rem; bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
@@ -1651,7 +1647,7 @@ async function streamLens({ title, prompt, structured, target, metaOverride, ver
   if (verseText) {
     const vq = document.createElement("div");
     vq.className = "verse-quote";
-    vq.innerHTML = `<div class="vq-text">${escapeHtml(verseText)}</div>${verseRef ? `<div class="vq-ref">${escapeHtml(verseRef)}</div>` : ""}`;
+    vq.innerHTML = `<div class="vq-text">\u201C${escapeHtml(verseText)}\u201D</div>`;
     const head = panel.querySelector(".ex-head");
     if (head && head.nextSibling) panel.insertBefore(vq, head.nextSibling); else panel.appendChild(vq);
   }
