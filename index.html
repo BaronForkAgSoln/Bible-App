@@ -86,6 +86,8 @@
   /* ---------- Page 2: Reading ---------- */
   #readView { padding: 1.4rem clamp(1.25rem, 5vw, 4rem) 4rem; max-width: 46rem; margin: 0 auto; }
   .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .book-overview-btn { margin-left: auto; align-self: center; }
+  .book-overview-btn[hidden] { display: none; }
   .settings-wrap { position: relative; }
   .to-top {
     position: fixed; right: 1rem; bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
@@ -589,6 +591,29 @@
     font-size: 0.9rem; padding: 0.3rem 0.5rem; border-radius: 4px;
   }
   .cv-del:hover { color: var(--rubric); background: var(--hover); }
+  .cv-info {
+    flex: none; background: none; border: none; cursor: pointer; color: var(--muted);
+    font-size: 1.05rem; padding: 0.2rem 0.5rem; border-radius: 4px; line-height: 1;
+  }
+  .cv-info:hover { color: var(--rubric); background: var(--hover); }
+  .bio-overlay {
+    position: fixed; inset: 0; background: rgba(28,27,26,0.4);
+    display: flex; align-items: center; justify-content: center; z-index: 60; padding: 1.2rem;
+  }
+  .bio-panel {
+    background: var(--paper); border-radius: 10px; padding: 1.4rem 1.5rem;
+    max-width: 30rem; width: 100%; box-shadow: 0 10px 34px rgba(28,27,26,0.32);
+    max-height: 80vh; overflow-y: auto;
+  }
+  .bio-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.5rem; }
+  .bio-name { font-family: var(--serif); font-size: 1.4rem; color: var(--rubric); }
+  .bio-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1rem; padding: 0.2rem 0.4rem; }
+  .bio-x:hover { color: var(--rubric); }
+  .bio-note {
+    font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 0.9rem;
+  }
+  .bio-text { font-family: var(--serif); font-size: 1.02rem; line-height: 1.7; color: var(--ink); margin: 0; }
   .council-add {
     display: block; width: 100%; text-align: left; background: none; border: none;
     border-top: 1px solid var(--rule); padding: 0.6rem 0.2rem; cursor: pointer;
@@ -797,6 +822,7 @@
   <div class="read-top">
     <button class="back-btn" id="backBtn">&larr; Books</button>
     <div class="bookname" id="bookName"></div>
+    <button class="read-btn book-overview-btn" id="bookOverviewBtn" title="Overview of this book" hidden>&#10087; Book Overview</button>
   </div>
   <div class="chapter-strip" id="chapterStrip"></div>
   <div id="reader"></div>
@@ -960,10 +986,43 @@ function openBook(code) {
     strip.appendChild(b);
   }
   $("reader").innerHTML = `<p class="welcome">Select a chapter of ${name}.</p>`;
+  const boBtn = $("bookOverviewBtn");
+  if (boBtn) { boBtn.hidden = false; boBtn.onclick = () => runBookOverview(code, name); }
   selectedVerses.clear();
   currentChapter = null;
   updateSelBar();
   showView("readView");
+}
+
+function runBookOverview(code, name) {
+  const trans = currentTransName();
+  const prompt = `Provide a rich, welcoming OVERVIEW of the book of ${name} \u2014 the kind of orientation a reader would want before beginning to read the book. This is a book-level overview, not a chapter summary.
+
+Cover, in flowing spoken prose written to be HEARD (no headers, no bullet points, no section labels \u2014 let it flow naturally as continuous teaching):
+- Who wrote it (as traditionally and scholarly understood), when, and to whom.
+- The historical and cultural background and the situation that occasioned it.
+- The structure and flow of the book \u2014 how it unfolds and where its major movements fall.
+- Its central themes and message.
+- How it fits within the larger sweep of Scripture and points to Christ.
+- A few of its most significant or beloved passages.
+
+Teach from historic Protestant, Reformation conviction (Scripture as final authority), drawing gratefully on the wider tradition, and avoid contemporary political or cultural framing. Warm, substantive, and reverent. Aim for roughly 600\u2013900 words \u2014 a real orientation a listener could take in before reading. Begin directly; do not open with filler.`;
+  const meta = { title: `Book Overview \u2014 ${name}`, label: "Book Overview", trans };
+  const boBtn = $("bookOverviewBtn");
+  if (boBtn) boBtn.hidden = true;   // hide the launcher; panel takes over
+  streamLens({
+    title: `Book Overview \u2014 ${name}`,
+    prompt, structured: false,
+    metaOverride: meta
+  });
+  // restore the launcher when the overview panel is closed
+  const panel = document.getElementById("exegesisPanel");
+  if (panel) {
+    panel.querySelector(".ex-close").addEventListener("click", () => {
+      const b = $("bookOverviewBtn");
+      if (b && state.book && !currentChapter) b.hidden = false;
+    });
+  }
 }
 
 /* ---------- Chapter loading (two sources) ---------- */
@@ -972,6 +1031,8 @@ async function loadChapter(code, chapter, keepReading) {
   const [, name, chapterCount] = ALL.find(b => b[0] === code);
   state.book = code;
   state.chapter = chapter;
+  const boBtn = $("bookOverviewBtn");
+  if (boBtn) boBtn.hidden = true;   // book-level overview only shows on the book screen
   document.querySelectorAll("#chapterStrip button").forEach(b =>
     b.classList.toggle("active", Number(b.textContent) === chapter));
   const reader = $("reader");
@@ -1732,7 +1793,7 @@ Open this section with the passage as a whole, interlinear-style, one labeled li
 **Hebrew:** (or **Greek:**) <the full original text of the passage in its own script>
 **Transliteration:** <the full transliteration>
 **${currentChapter.trans.split("\u2014")[0].trim()}:** <the passage as given above>
-Then the word entries. ${wordScope}, Strong's Concordance\u2013style: the original word in its own script, transliteration, Strong's number (omit the number rather than guess if uncertain), root meaning, notable uses elsewhere in Scripture, and what the English translation may flatten. Give each word its own short entry; brief entries are fine for minor words. This section may run longer than the others when needed to cover the words.
+Then the word entries. ${wordScope}, Strong's Concordance\u2013style. Begin each entry with the English word or short phrase from the ${currentChapter.trans.split("\u2014")[0].trim()} translation that this original word renders, in bold, followed by an em dash \u2014 so the reader instantly knows which English word is under discussion. Then give: the original word in its own script, transliteration, Strong's number (omit the number rather than guess if uncertain), root meaning, notable uses elsewhere in Scripture, and what the English translation may flatten. For example: **"I pray"** \u2014 \u03C0\u03C1\u03BF\u03C3\u03B5\u03CD\u03C7\u03BF\u03BC\u03B1\u03B9 \u2014 proseuchomai \u2014 G4336 \u2014 <the rest>. If a word is untranslated in English (such as the Hebrew object marker), say so plainly (e.g. **"(untranslated object marker)"**) instead of forcing an English word. Give each word its own short entry; brief entries are fine for minor words. This section may run longer than the others when needed to cover the words.
 ## Canon
 How this passage connects to the wider sweep of Scripture, with cross-references.
 ## Theology
@@ -1777,13 +1838,20 @@ $("verseAskBtn").addEventListener("click", () => {
 
 /* ================= Council of Voices ================= */
 const HISTORICAL_VOICES = [
-  { name: "Augustine", note: "grace, sin, the restless heart" },
-  { name: "Aquinas", note: "reason and faith, careful distinctions" },
-  { name: "Luther", note: "grace alone, Scripture alone" },
-  { name: "Calvin", note: "God's sovereignty, careful exposition" },
-  { name: "Wesley", note: "grace for all, holiness of life" },
-  { name: "Spurgeon", note: "warm, vivid, pastoral" },
-  { name: "C.S. Lewis", note: "imagination, reason, the ordinary reader" }
+  { name: "Augustine", note: "grace, sin, the restless heart",
+    bio: "Augustine of Hippo (354\u2013430) was a North African bishop and the most influential theologian of the early Western church. Converted after a restless, searching youth\u2014vividly told in his Confessions\u2014he wrote profoundly on grace, sin, the will, and the City of God. His emphasis that the heart is restless until it rests in God shaped Christian thought for a thousand years and deeply influenced the Reformers." },
+  { name: "Aquinas", note: "reason and faith, careful distinctions",
+    bio: "Thomas Aquinas (1225\u20131274) was an Italian Dominican friar and the towering theologian of the medieval church. In his Summa Theologica he sought to show that reason and faith are not enemies but companions, carefully distinguishing what can be known by reason and what is received by revelation. His rigorous, ordered method still marks how theology is done." },
+  { name: "Luther", note: "grace alone, Scripture alone",
+    bio: "Martin Luther (1483\u20131546) was the German monk whose rediscovery of justification by faith alone sparked the Protestant Reformation. Wrestling with a terrified conscience, he found peace in Paul's gospel of grace. His stand on Scripture alone as the final authority, and his translation of the Bible into German, reshaped the church and the Western world." },
+  { name: "Calvin", note: "God's sovereignty, careful exposition",
+    bio: "John Calvin (1509\u20131564) was a French Reformer based in Geneva, and the most systematic mind of the Reformation. His Institutes of the Christian Religion and his careful, verse-by-verse commentaries emphasized the sovereignty of God, the authority of Scripture, and the glory of God in all things. His thought anchors the Reformed tradition." },
+  { name: "Wesley", note: "grace for all, holiness of life",
+    bio: "John Wesley (1703\u20131791) was an English evangelist and founder of the Methodist movement. Preaching tirelessly across Britain, he stressed grace freely offered to all, the new birth, and the pursuit of holiness in everyday life. His warm, practical faith and concern for the poor left a lasting mark on evangelical Christianity." },
+  { name: "Spurgeon", note: "warm, vivid, pastoral",
+    bio: "Charles Haddon Spurgeon (1834\u20131892) was a English Baptist preacher known as the \u201CPrince of Preachers.\u201D Preaching to thousands in London, he combined vivid imagery, warm pastoral care, and a deep grasp of grace. His sermons, still widely read, are treasured for making rich theology plain and moving to ordinary hearers." },
+  { name: "C.S. Lewis", note: "imagination, reason, the ordinary reader",
+    bio: "C.S. Lewis (1898\u20131963) was an Oxford and Cambridge scholar of literature and the twentieth century's most beloved lay defender of the faith. A former atheist, he wrote for ordinary readers with rare clarity and imagination\u2014Mere Christianity, The Chronicles of Narnia, and much more\u2014commending Christianity to both reason and longing." }
 ];
 const MODERN_VOICES_MAX = 3;
 
@@ -1813,7 +1881,10 @@ function mountCouncilPanel() {
   panel.id = "exegesisPanel";
   const modern = getModernVoices();
   const histRow = HISTORICAL_VOICES.map(v =>
-    `<button class="council-item" data-voice="${escapeHtml(v.name)}"><span class="cv-name">${escapeHtml(v.name)}</span><span class="cv-note"> \u2014 ${escapeHtml(v.note)}</span></button>`).join("");
+    `<div class="council-item-row">
+       <button class="council-item" data-voice="${escapeHtml(v.name)}"><span class="cv-name">${escapeHtml(v.name)}</span><span class="cv-note"> \u2014 ${escapeHtml(v.note)}</span></button>
+       <button class="cv-info" data-bio="${escapeHtml(v.name)}" title="About ${escapeHtml(v.name)}">\u24D8</button>
+     </div>`).join("");
   const modernRows = modern.map((v, i) =>
     `<div class="council-item-row">
        <button class="council-item" data-voice="${escapeHtml(v.name)}"><span class="cv-name">${escapeHtml(v.name)}</span>${v.note ? `<span class="cv-note"> \u2014 ${escapeHtml(v.note)}</span>` : ""}${v.level === "Limited" ? ` <span class="cv-flag">caution</span>` : ""}</button>
@@ -1861,6 +1932,31 @@ function mountCouncilPanel() {
   });
   const addBtn = $("councilAddBtn");
   if (addBtn) addBtn.addEventListener("click", showAddVoiceForm);
+  panel.querySelectorAll(".cv-info").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.getAttribute("data-bio");
+      const v = HISTORICAL_VOICES.find(x => x.name === name);
+      if (v) showVoiceBio(v);
+    });
+  });
+}
+
+function showVoiceBio(v) {
+  const ov = document.createElement("div");
+  ov.className = "bio-overlay";
+  ov.innerHTML = `
+    <div class="bio-panel">
+      <div class="bio-head">
+        <span class="bio-name">${escapeHtml(v.name)}</span>
+        <button class="bio-x" title="Close">\u2715</button>
+      </div>
+      <p class="bio-note">${escapeHtml(v.note)}</p>
+      <p class="bio-text">${escapeHtml(v.bio)}</p>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector(".bio-x").addEventListener("click", () => ov.remove());
+  ov.addEventListener("click", (e) => { if (e.target === ov) ov.remove(); });
 }
 
 function runCouncilReading(voice, ref, text) {
@@ -2226,10 +2322,10 @@ function showAsk(seedContext, verseCtx) {
       </div>
       <div class="ask-choice">
         <button class="ask-choice-btn quick" id="askGo">
-          <span class="acb-title">Quick Answer</span><span class="acb-cap">a written reply</span>
+          <span class="acb-title">Quick Answer</span><span class="acb-cap">a short written reply</span>
         </button>
         <button class="ask-choice-btn deep" id="askIllumine">
-          <span class="acb-title">Deeper Illumination</span><span class="acb-cap">a spoken treatment</span>
+          <span class="acb-title">Deeper Illumination</span><span class="acb-cap">a spoken treatment &middot; ~15&ndash;20 min</span>
         </button>
       </div>
       <div class="ask-recent" id="askRecent"></div>
