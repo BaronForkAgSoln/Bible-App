@@ -88,6 +88,15 @@
   .read-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
   .book-overview-btn { margin-left: auto; align-self: center; }
   .book-overview-btn[hidden] { display: none; }
+  .verse-quote {
+    margin: 0 1.1rem 0.2rem; padding: 0.7rem 0 0.7rem 0.9rem;
+    border-left: 2px solid var(--rubric);
+  }
+  .verse-quote .vq-text { font-family: var(--serif); font-style: italic; font-size: 1.02rem; line-height: 1.6; color: var(--ink); }
+  .verse-quote .vq-ref {
+    font-family: var(--sans); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin-top: 0.35rem;
+  }
   .settings-wrap { position: relative; }
   .to-top {
     position: fixed; right: 1rem; bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
@@ -1635,9 +1644,17 @@ function renderStructured(src, openState, sectionsOut) {
   return html;
 }
 
-async function streamLens({ title, prompt, structured, target, metaOverride }) {
+async function streamLens({ title, prompt, structured, target, metaOverride, verseText, verseRef }) {
   const panel = mountExegesisPanel(title, !structured, target);
   const body = panel.querySelector(".ex-body");
+  // Quiet, set-apart verse reference at the top of verse-anchored panels
+  if (verseText) {
+    const vq = document.createElement("div");
+    vq.className = "verse-quote";
+    vq.innerHTML = `<div class="vq-text">${escapeHtml(verseText)}</div>${verseRef ? `<div class="vq-ref">${escapeHtml(verseRef)}</div>` : ""}`;
+    const head = panel.querySelector(".ex-head");
+    if (head && head.nextSibling) panel.insertBefore(vq, head.nextSibling); else panel.appendChild(vq);
+  }
   const meta = metaOverride || {
     title,
     label: title.split("\u2014")[0].trim(),
@@ -1769,6 +1786,11 @@ function selectedPassage() {
     text: chapterVerses.filter(v => v.n >= a && v.n <= b).map(v => `${v.n} ${v.text}`).join("\n")
   };
 }
+/* Verse text for the quote line at the top of a study panel:
+   join the selected verses, strip leading verse numbers for clean reading. */
+function cleanVerseText(text) {
+  return text.split("\n").map(line => line.replace(/^\d+\s*/, "").trim()).filter(Boolean).join(" ");
+}
 
 function buildExegesisPrompt() {
   const { ref, text } = selectedPassage();
@@ -1820,14 +1842,14 @@ End with exactly these two lines:
 
 $("exegesisBtn").addEventListener("click", () => {
   if (!currentChapter || !chapterVerses || !selRange()) return;
-  const { ref } = selectedPassage();
-  streamLens({ title: `Exegesis \u2014 ${ref}`, prompt: buildExegesisPrompt(), structured: true });
+  const { ref, text } = selectedPassage();
+  streamLens({ title: `Exegesis \u2014 ${ref}`, prompt: buildExegesisPrompt(), structured: true, verseText: cleanVerseText(text), verseRef: ref });
 });
 
 $("reflectBtn").addEventListener("click", () => {
   if (!currentChapter || !chapterVerses || !selRange()) return;
-  const { ref } = selectedPassage();
-  streamLens({ title: `Devotional \u2014 ${ref}`, prompt: buildReflectionPrompt(), structured: false });
+  const { ref, text } = selectedPassage();
+  streamLens({ title: `Devotional \u2014 ${ref}`, prompt: buildReflectionPrompt(), structured: false, verseText: cleanVerseText(text), verseRef: ref });
 });
 
 $("verseAskBtn").addEventListener("click", () => {
@@ -1988,7 +2010,8 @@ Essential rules:
   const title = isAuto ? `Council \u2014 ${ref}` : `${voiceName} \u2014 ${ref}`;
   streamLens({
     title, prompt, structured: false,
-    metaOverride: { title, label: "Council of Voices", trans: currentChapter.trans }
+    metaOverride: { title, label: "Council of Voices", trans: currentChapter.trans },
+    verseText: cleanVerseText(text), verseRef: ref
   });
   // Add the honesty subnote under the header once the panel mounts
   setTimeout(() => {
