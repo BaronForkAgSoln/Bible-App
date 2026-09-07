@@ -535,10 +535,10 @@
   .acb-cap { font-family: var(--sans); font-size: 0.64rem; }
 
   /* ---------- Illumination screen ---------- */
-  .illum-loading { text-align: center; padding: 2.5rem 1rem; }
-  .illum-loading .ex-spinner { margin: 0 auto 1rem; width: 26px; height: 26px; }
-  .illum-loading-text { font-family: var(--serif); font-size: 1.1rem; color: var(--ink); }
-  .illum-loading-sub { font-family: var(--sans); font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+  .illum-loading { text-align: center; padding: 3rem 1rem; }
+  .illum-loading .ex-spinner { margin: 0 auto 1.2rem; width: 40px; height: 40px; border-width: 3px; }
+  .illum-loading-text { font-family: var(--serif); font-size: 1.15rem; color: var(--ink); }
+  .illum-loading-sub { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.4rem; }
   .illum-card {
     background: #F8F5F0; border-left: 3px solid var(--rubric); border-radius: 0 8px 8px 0;
     padding: 1.5rem 1.4rem 1.3rem; max-width: 34rem;
@@ -562,9 +562,16 @@
   .illum-readlink:hover { color: var(--ink); }
   .illum-text { margin-top: 1.2rem; }
   .illum-text p { font-family: var(--serif); font-size: 1.05rem; line-height: 1.75; color: var(--ink); margin: 0 0 1rem; }
-  .illum-save-row { text-align: center; margin-top: 0.9rem; }
-  .illum-save { background: none; border: none; cursor: pointer; font-family: var(--sans); font-size: 0.72rem; color: #9a958c; }
-  .illum-save:hover { color: var(--rubric); }
+  .illum-copy-row { text-align: center; margin-top: 0.6rem; padding-top: 0.9rem; border-top: 1px solid #E0D9CF; }
+  .illum-save { background: none; border: 1px solid var(--rule); border-radius: 5px; cursor: pointer; font-family: var(--sans); font-size: 0.76rem; color: var(--ink); padding: 0.45rem 1rem; }
+  .illum-save:hover { background: var(--hover); color: var(--rubric); }
+  .illum-transport { margin: 0 0 1.2rem; }
+  .illum-progress { height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+  .illum-progress-fill { height: 100%; width: 0%; background: var(--rubric); border-radius: 3px; transition: width 0.3s ease; }
+  .illum-transport-row { display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; }
+  .illum-t-btn { background: none; border: 1px solid var(--rule); border-radius: 5px; cursor: pointer; font-family: var(--sans); font-size: 0.76rem; color: var(--ink); padding: 0.4rem 0.9rem; }
+  .illum-t-btn:hover { background: var(--hover); color: var(--rubric); }
+  .illum-progress-label { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); }
   .link-btn { background: none; border: none; color: var(--rubric); cursor: pointer; text-decoration: underline; font: inherit; }
 
   /* ---------- Council of Voices & Youth ---------- */
@@ -2424,6 +2431,7 @@ function runAsk() {
 $("askBtn").addEventListener("click", () => { askReturn = null; showAsk(); });
 $("askBackBtn").addEventListener("click", () => {
   ttsStop(); illumReading = false;
+  if (illumPlayer) { illumPlayer.stopped = true; illumPlayer = null; speechSynthesis.cancel(); }
   $("askReader").innerHTML = "";
   if (askReturn) {
     const r = askReturn; askReturn = null;
@@ -2487,12 +2495,26 @@ async function runIllumination() {
     <div class="illum-loading">
       <div class="ex-spinner"></div>
       <div class="illum-loading-text">Preparing your Illumination\u2026</div>
-      <div class="illum-loading-sub">A spoken treatment takes a moment to compose.</div>
+      <div class="illum-loading-sub" id="illumLoadingSub">Reading the passage and gathering the threads\u2026</div>
     </div>`;
+  const loadMsgs = [
+    "Reading the passage and gathering the threads\u2026",
+    "Drawing on Scripture and the tradition\u2026",
+    "Composing the teaching\u2026",
+    "Shaping it for the ear\u2026",
+    "Almost ready\u2026"
+  ];
+  let loadStep = 0;
+  const loadTimer = setInterval(() => {
+    loadStep++;
+    const sub = $("illumLoadingSub");
+    if (sub && loadStep < loadMsgs.length) sub.textContent = loadMsgs[loadStep];
+  }, 4000);
 
   const prompt = buildIlluminationPrompt(topic);
   try {
     const res = await aiFetch({ model: EXEGESIS_MODEL, max_tokens: 8000, messages: [{ role: "user", content: prompt }] });
+    clearInterval(loadTimer);
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try { const e = await res.json(); if (e.error && e.error.message) msg = e.error.message; } catch (e) {}
@@ -2504,6 +2526,7 @@ async function runIllumination() {
     if (!text) { el.innerHTML = `<p class="ex-status">Nothing came back \u2014 try again.</p>`; return; }
     showIllumination(topic, text);
   } catch (err) {
+    clearInterval(loadTimer);
     el.innerHTML = `<p class="ex-status">Couldn't reach the API (${escapeHtml(err.message)}). <button class="link-btn" onclick="showAsk()">Back</button></p>`;
   }
 }
@@ -2514,10 +2537,25 @@ function estIllumMinutes(text) {
 }
 
 let illumReading = false;
+let illumPlayer = null;   // { chunks, idx, paused, stopped }
+
+/* Strip markdown so the voice doesn't read "asterisk", "pound", etc. */
+function speechClean(s) {
+  return s
+    .replace(/[*_#`]+/g, "")      // markdown emphasis / headers / code
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function showIllumination(topic, text) {
   const el = $("askReader");
   const mins = estIllumMinutes(text);
   const title = topic.length > 70 ? topic.slice(0, 68) + "\u2026" : topic;
+  // Build spoken chunks once: paragraph -> sentences, markdown removed.
+  const chunks = text.split(/\n\s*\n/)
+    .flatMap(p => speechClean(p).match(/[^.!?]+[.!?]*/g) || [])
+    .map(s => s.trim()).filter(Boolean);
+
   el.innerHTML = `
     <div class="illum-card">
       <div class="illum-tag">Illumination</div>
@@ -2527,47 +2565,99 @@ function showIllumination(topic, text) {
         <button class="illum-play" id="illumPlay" title="Listen">&#9654;</button>
         <div class="illum-listen-label" id="illumPlayLabel">Listen</div>
       </div>
+      <div class="illum-transport" id="illumTransport" hidden>
+        <div class="illum-progress"><div class="illum-progress-fill" id="illumProgressFill"></div></div>
+        <div class="illum-transport-row">
+          <button class="illum-t-btn" id="illumRestart" title="Start over">&#8634; Start over</button>
+          <div class="illum-progress-label" id="illumProgressLabel"></div>
+        </div>
+      </div>
       <div class="illum-secondary">
         <button class="illum-readlink" id="illumReadToggle">Read the text instead</button>
       </div>
       <div class="illum-text" id="illumText" hidden></div>
-    </div>
-    <div class="illum-save-row"><button class="illum-save" id="illumSave">Save a copy</button></div>`;
+    </div>`;
 
   const playBtn = $("illumPlay");
   const playLabel = $("illumPlayLabel");
-  playBtn.addEventListener("click", () => {
-    if (illumReading) {
-      ttsStop(); illumReading = false;
-      playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Listen";
-      return;
-    }
-    // chunk into sentences/paragraphs for smooth speaking
-    const chunks = text.split(/\n\s*\n/).flatMap(p => p.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]*/g) || []).map(s => s.trim()).filter(Boolean);
+  const transport = $("illumTransport");
+  const progressFill = $("illumProgressFill");
+  const progressLabel = $("illumProgressLabel");
+
+  function updateProgress() {
+    if (!illumPlayer) return;
+    const pct = Math.round((illumPlayer.idx / chunks.length) * 100);
+    progressFill.style.width = pct + "%";
+    progressLabel.textContent = `${Math.min(illumPlayer.idx + 1, chunks.length)} of ${chunks.length}`;
+  }
+
+  function speakFrom(i) {
+    if (!illumPlayer || illumPlayer.stopped) return;
+    if (i >= chunks.length) { finishPlayback(); return; }
+    illumPlayer.idx = i;
+    updateProgress();
+    const u = new SpeechSynthesisUtterance(chunks[i]);
+    const v = ttsPickVoice();
+    if (v) u.voice = v;
+    u.rate = TTS_RATE;
+    u.onend = () => { if (illumPlayer && !illumPlayer.paused && !illumPlayer.stopped) speakFrom(i + 1); };
+    u.onerror = () => { if (illumPlayer && !illumPlayer.paused && !illumPlayer.stopped) speakFrom(i + 1); };
+    speechSynthesis.speak(u);
+  }
+
+  function startPlayback(fromIdx) {
+    speechSynthesis.cancel();
+    illumPlayer = { idx: fromIdx || 0, paused: false, stopped: false };
     illumReading = true;
-    playBtn.innerHTML = "\u25A0"; playLabel.textContent = "Stop";
-    ttsController = ttsSpeak(chunks, null, () => {
-      illumReading = false; playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Listen"; ttsController = null;
-    });
+    transport.hidden = false;
+    playBtn.innerHTML = "\u23F8"; playLabel.textContent = "Pause";
+    speakFrom(illumPlayer.idx);
+  }
+  function pausePlayback() {
+    if (!illumPlayer) return;
+    illumPlayer.paused = true;
+    speechSynthesis.cancel();   // cancel; we resume from current idx
+    playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Resume";
+  }
+  function resumePlayback() {
+    if (!illumPlayer) { startPlayback(0); return; }
+    illumPlayer.paused = false;
+    playBtn.innerHTML = "\u23F8"; playLabel.textContent = "Pause";
+    speakFrom(illumPlayer.idx);
+  }
+  function finishPlayback() {
+    illumReading = false;
+    playBtn.innerHTML = "\u25B6"; playLabel.textContent = "Listen";
+    progressFill.style.width = "100%";
+    progressLabel.textContent = "Finished";
+    illumPlayer = null;
+  }
+
+  playBtn.addEventListener("click", () => {
+    if (!illumPlayer) { startPlayback(0); return; }
+    if (illumPlayer.paused) { resumePlayback(); }
+    else { pausePlayback(); }
   });
+  $("illumRestart").addEventListener("click", () => { startPlayback(0); });
 
   $("illumReadToggle").addEventListener("click", () => {
     const t = $("illumText");
     if (t.hidden) {
-      t.innerHTML = text.split(/\n\s*\n/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join("");
+      t.innerHTML =
+        text.split(/\n\s*\n/).map(p => `<p>${escapeHtml(speechClean(p))}</p>`).join("") +
+        `<div class="illum-copy-row"><button class="illum-save" id="illumSave">&#x29C9; Copy text</button></div>`;
       t.hidden = false;
       $("illumReadToggle").textContent = "Hide the text";
+      $("illumSave").addEventListener("click", () => {
+        const payload = `Illumination \u2014 ${topic}\n\n${text}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(payload).then(() => showToast("Illumination copied")).catch(() => window.prompt("Copy:", payload));
+        } else { window.prompt("Copy:", payload); }
+      });
     } else {
       t.hidden = true;
       $("illumReadToggle").textContent = "Read the text instead";
     }
-  });
-
-  $("illumSave").addEventListener("click", () => {
-    const payload = `Illumination \u2014 ${topic}\n\n${text}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(payload).then(() => showToast("Illumination copied")).catch(() => window.prompt("Copy:", payload));
-    } else { window.prompt("Copy:", payload); }
   });
 }
 
