@@ -590,6 +590,24 @@
   .council-item:hover .cv-name { color: var(--rubric); }
   .council-auto { border: none; }
   .council-auto .cv-name { color: var(--rubric); }
+  .council-convene { border: none; background: #F0E6D8; border-radius: 6px; margin-bottom: 0.5rem; padding: 0.7rem 0.75rem; }
+  .council-convene .cv-name { color: var(--rubric); font-weight: 600; }
+  .council-convene:hover { background: #EADCC8; }
+  .council-progress { text-align: center; padding: 2.4rem 1rem; }
+  .council-progress .cp-status { font-family: var(--serif); font-size: 1.08rem; color: var(--ink); }
+  .council-progress .cp-sub { font-family: var(--sans); font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; }
+  .council-verdict { background: #F0E6D8; border-radius: 6px; padding: 12px 14px; margin: 0 0 1rem; }
+  .cv-verdict-label { font-family: var(--sans); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--rubric); margin-bottom: 0.25rem; }
+  .cv-verdict-text { font-family: var(--serif); font-style: italic; font-size: 1.0rem; line-height: 1.5; color: var(--ink); }
+  .council-shared { border: 1px solid var(--rule); border-radius: 6px; margin: 0 0 1.1rem; }
+  .council-shared summary { font-family: var(--sans); font-size: 0.74rem; font-weight: 500; color: var(--rubric); cursor: pointer; padding: 0.6rem 0.8rem; list-style: none; }
+  .council-shared summary::-webkit-details-marker { display: none; }
+  .council-shared summary::before { content: "▸ "; color: var(--muted); }
+  .council-shared[open] summary::before { content: "▾ "; }
+  .council-shared .cs-hint { color: var(--muted); font-weight: 400; }
+  .council-shared .cs-body { padding: 0 0.9rem 0.8rem; font-family: var(--serif); font-size: 0.95rem; line-height: 1.65; color: var(--ink); }
+  .council-assess-label { font-family: var(--sans); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--rubric); margin-bottom: 0.6rem; }
+  .council-assess { font-family: var(--serif); font-size: 1.0rem; line-height: 1.7; color: var(--ink); }
   .cv-name { font-size: 1rem; color: var(--ink); }
   .cv-note { font-family: var(--sans); font-size: 0.72rem; color: var(--muted); }
   .cv-flag {
@@ -1927,6 +1945,7 @@ function mountCouncilPanel() {
     <div class="ex-body">
       <div class="verse-quote"><div class="vq-text">\u201C${escapeHtml(cleanVerseText(text))}\u201D</div></div>
       <p class="council-intro">Choose a voice \u2014 each offers an informed characterization in the spirit of that teacher, not their actual words.</p>
+      <button class="council-item council-convene" id="councilConveneBtn"><span class="cv-name">\u2b25 Convene the Full Council</span><span class="cv-note"> all voices deliberate together \u2014 for a deeper, harder verse (takes longer)</span></button>
       <button class="council-item council-auto" data-voice="__auto__"><span class="cv-name">\u2726 Let the Council choose</span><span class="cv-note"> the voice best suited to this verse</span></button>
       <div class="council-tier">Historical Voices</div>
       <div class="council-list">${histRow}</div>
@@ -1958,6 +1977,8 @@ function mountCouncilPanel() {
   });
   const addBtn = $("councilAddBtn");
   if (addBtn) addBtn.addEventListener("click", showAddVoiceForm);
+  const conveneBtn = $("councilConveneBtn");
+  if (conveneBtn) conveneBtn.addEventListener("click", () => runFullCouncil(ref, text));
   panel.querySelectorAll(".cv-info").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2030,6 +2051,160 @@ Essential rules:
       if (body && body.firstChild) body.insertBefore(note, body.firstChild);
     }
   }, 60);
+}
+
+/* ================= Council in Session (full Council deliberation) ================= */
+async function aiText(payload) {
+  const res = await aiFetch(payload);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.content || []).map(b => b.text || "").join("").trim();
+}
+
+function fullCouncilMembers() {
+  return HISTORICAL_VOICES.map(v => ({ name: v.name, level: null }))
+    .concat(getModernVoices().map(v => ({ name: v.name, level: v.level })));
+}
+
+async function runFullCouncil(ref, text) {
+  const trans = currentChapter.trans;
+  const members = fullCouncilMembers();
+  const old = document.getElementById("exegesisPanel");
+  if (old) old.remove();
+  const panel = document.createElement("div");
+  panel.className = "exegesis-panel";
+  panel.id = "exegesisPanel";
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>⬥ Council in Session — ${escapeHtml(ref)}</span>
+      <div class="ex-tools"><button class="ex-close" title="Close">✕</button></div>
+    </div>
+    <div class="ex-body">
+      <div class="verse-quote"><div class="vq-text">“${escapeHtml(cleanVerseText(text))}”</div></div>
+      <div class="council-progress">
+        <div class="ex-spinner" style="margin:0 auto 1rem;width:34px;height:34px;border-width:3px"></div>
+        <div class="cp-status" id="cpStatus">The Council is assembling…</div>
+        <div class="cp-sub">This takes a minute — each voice weighs in, then the Council deliberates.</div>
+      </div>
+    </div>`;
+  let stopped = false;
+  panel.querySelector(".ex-close").addEventListener("click", () => { stopped = true; panel.remove(); restoreSelBar(); });
+  const reader = $("reader");
+  const pager = reader.querySelector(".pager");
+  if (pager) reader.insertBefore(panel, pager); else reader.appendChild(panel);
+  hideSelBarForPanel();
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+  const setStatus = (s) => { const el = $("cpStatus"); if (el) el.textContent = s; };
+
+  try {
+    setStatus("Reading the passage — preparing the shared ground…");
+    const briefingPrompt = `You are preparing a concise exegetical briefing on ${ref} (${trans}) that a council of theologians will convene around. The passage:
+
+${text}
+
+Give the grammatical-historical essentials only — what the voices need as common ground before they interpret:
+- Key original-language words and their force (brief).
+- Historical/cultural context and the situation in view.
+- The genuinely open cruxes — where the text is ambiguous or disputed at the level of meaning.
+
+Write flowing prose, about 150–250 words, no headers. Teach from historic Protestant conviction (Scripture as final authority) but keep this strictly to the shared reading of the text, not theological application. Do not fabricate quotations or citations.`;
+    const briefing = await aiText({ model: EXEGESIS_MODEL, max_tokens: 1200, messages: [{ role: "user", content: briefingPrompt }] });
+    if (stopped) return;
+
+    const perspectives = [];
+    for (let i = 0; i < members.length; i++) {
+      if (stopped) return;
+      const mem = members[i];
+      setStatus(`${mem.name} is weighing in…  (${i + 1} of ${members.length})`);
+      const caution = (mem.level === "Limited")
+        ? " If you cannot credibly characterize this teacher's specific approach, say so honestly rather than inventing."
+        : "";
+      const vp = `A council of teachers is deliberating on ${ref} (${trans}). They share this exegetical reading of the text:
+
+"${briefing}"
+
+Give ${mem.name}'s perspective on this passage, bringing their distinctive theology and emphases to bear on the shared reading above. An INFORMED CHARACTERIZATION in the spirit of ${mem.name}'s known theology — never fabricated direct quotations. Ground it in their actual documented outlook. Two to three substantive paragraphs, flowing prose, no headers, from a historic Protestant frame.${caution}`;
+      try {
+        const p = await aiText({ model: EXEGESIS_MODEL, max_tokens: 1500, messages: [{ role: "user", content: vp }] });
+        perspectives.push({ name: mem.name, text: p });
+      } catch (e) {}
+    }
+    if (stopped) return;
+    if (!perspectives.length) throw new Error("No perspectives returned");
+
+    setStatus("The Council is deliberating — weighing the voices together…");
+    const joined = perspectives.map(p => `=== ${p.name} ===\n${p.text}`).join("\n\n");
+    const synthPrompt = `A council of teachers has each given their perspective on ${ref} (${trans}), grounded in this shared reading of the text:
+
+"${briefing}"
+
+Here are the perspectives:
+
+${joined}
+
+Now write THE COUNCIL'S ASSESSMENT — a synthesis that weaves these voices together. Structure it in three movements, each a short bolded label followed by prose (use **bold** for the three labels only):
+**Where the Council speaks as one.** The genuine consensus, resting on the shared reading.
+**Where the voices genuinely diverge.** The real theological tensions — name who leans which way and why. Do NOT manufacture a false consensus or resolve the tension into one party's formula; where the faithful genuinely differ, hold it open and say so.
+**The fullest understanding that emerges.** What hearing them together yields that no single voice would.
+
+Then, as the very first line of your entire response, before the three movements, give one line beginning "VERDICT: " followed by a single sentence capturing the Council's bottom-line finding (including any genuine division).
+
+Warm, reverent, substantive. Historic Protestant frame, Scripture as final authority. Never fabricate quotations. Begin with the VERDICT line.`;
+    const synthesis = await aiText({ model: EXEGESIS_MODEL, max_tokens: 3000, messages: [{ role: "user", content: synthPrompt }] });
+    if (stopped) return;
+
+    showFullCouncil(ref, text, briefing, synthesis);
+  } catch (err) {
+    if (stopped) return;
+    const b = panel.querySelector(".ex-body");
+    if (b) b.innerHTML = `<p class="ex-status">The Council couldn't convene (${escapeHtml(err.message)}). Please try again.</p>`;
+  }
+}
+
+function showFullCouncil(ref, text, briefing, synthesis) {
+  let verdict = "", body = synthesis;
+  const m = synthesis.match(/^\s*VERDICT:\s*(.+?)(?:\n|$)/i);
+  if (m) { verdict = m[1].trim(); body = synthesis.slice(m[0].length).trim(); }
+
+  const panel = document.getElementById("exegesisPanel");
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="ex-head">
+      <span>⬥ Council in Session — ${escapeHtml(ref)}</span>
+      <div class="ex-tools">
+        <button class="ex-speak" id="exSpeak" title="Read aloud">\u{1F50A}</button>
+        <button class="sec-copy head-copy">⧉ Copy</button>
+        <button class="ex-close" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="ex-body">
+      <div class="verse-quote"><div class="vq-text">“${escapeHtml(cleanVerseText(text))}”</div></div>
+      ${verdict ? `<div class="council-verdict"><div class="cv-verdict-label">The Council's verdict</div><div class="cv-verdict-text">${escapeHtml(verdict)}</div></div>` : ""}
+      <details class="council-shared">
+        <summary>The shared reading <span class="cs-hint">(the text itself)</span></summary>
+        <div class="cs-body">${renderMd(briefing)}</div>
+      </details>
+      <div class="council-assess-label">The Council's Assessment</div>
+      <div class="council-assess">${renderMd(body)}</div>
+    </div>`;
+  panel.querySelector(".ex-close").addEventListener("click", () => { ttsStop(); panel.remove(); restoreSelBar(); });
+
+  const fullText = (verdict ? `The Council's verdict: ${verdict}\n\n` : "") + body;
+  const meta = { title: `Council in Session — ${ref}`, label: "Council in Session", trans: currentChapter.trans };
+  const hc = panel.querySelector(".head-copy");
+  if (hc) hc.addEventListener("click", () => copyStudyText(fullText, null, meta));
+
+  const spk = panel.querySelector("#exSpeak");
+  if (spk) spk.addEventListener("click", () => {
+    if (spk.classList.contains("tts-on")) { ttsStop(); return; }
+    ttsStop(); spk.classList.add("tts-on");
+    const readable = (verdict ? verdict + ". " : "") + body.replace(/[#*_`]/g, "");
+    const chunks = readable.split(/\n\s*\n/).flatMap(p => p.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]*/g) || []).map(s => s.trim()).filter(Boolean);
+    ttsController = ttsSpeak(chunks, null, () => { spk.classList.remove("tts-on"); ttsController = null; });
+  });
+
+  panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function showAddVoiceForm() {
