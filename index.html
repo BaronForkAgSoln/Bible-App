@@ -935,6 +935,15 @@ function populateFreeTranslations() {
     group.appendChild(o);
   }
   transSelect.appendChild(group);
+
+  const esvGroup = document.createElement("optgroup");
+  esvGroup.label = "English Standard Version";
+  const eo = document.createElement("option");
+  eo.value = "esv:esv";
+  eo.textContent = "ESV — English Standard Version";
+  esvGroup.appendChild(eo);
+  transSelect.appendChild(esvGroup);
+
   transSelect.value = "free:kjv";
 }
 
@@ -1106,6 +1115,19 @@ async function loadChapter(code, chapter, keepReading) {
         `<span class="verse" data-v="${v.verse}"><sup>${v.verse}</sup>${escapeHtml(v.text.trim())}</span>`).join(" ") + "</p>";
       plainText = verses.map(v => `${v.verse} ${v.text.trim().replace(/\s+/g, " ")}`).join("\n");
       chapterVerses = verses.map(v => ({ n: Number(v.verse), text: v.text.trim().replace(/\s+/g, " ") }));
+    } else if (source === "esv") {
+      const res = await esvFetch(`${name} ${chapter}`);
+      if (res.status === 401) throw new Error("ESV access not configured");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const raw = (data.passages && data.passages[0]) ? data.passages[0] : "";
+      if (!raw) throw new Error("No verses returned");
+      const verses = parseEsvPassage(raw);
+      if (!verses.length) throw new Error("No verses returned");
+      bodyHtml = "<p>" + verses.map(v =>
+        `<span class="verse" data-v="${v.n}"><sup>${v.n}</sup>${escapeHtml(v.text)}</span>`).join(" ") + "</p>";
+      plainText = verses.map(v => `${v.n} ${v.text}`).join("\n");
+      chapterVerses = verses.map(v => ({ n: v.n, text: v.text }));
     } else {
       const url = `${API_BIBLE.endpoint}/v1/bibles/${id}/chapters/${code}.${chapter}` +
         `?content-type=html&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
@@ -1164,6 +1186,18 @@ function splitSel(v) {
 }
 function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+/* Parse ESV passage/text output ("[1] In the beginning..." ) into verses. */
+function parseEsvPassage(str) {
+  const text = str.replace(/\s+/g, " ").trim();
+  const verses = [];
+  const re = /\[(\d+)\]\s*([^\[]*)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const t = m[2].trim();
+    if (t) verses.push({ n: Number(m[1]), text: t });
+  }
+  return verses;
 }
 
 /* ---------- Continuous reading (auto-advance) + wake lock ---------- */
@@ -1519,6 +1553,18 @@ function aiFetch(payloadObj) {
       "X-App-Gate": AI_PROXY_GATE,
     },
     body: JSON.stringify(payloadObj),
+  });
+}
+
+/* Fetch a chapter of ESV text through the proxy's /esv lane. */
+function esvFetch(passage) {
+  return fetch(AI_PROXY_URL + "/esv", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-App-Gate": AI_PROXY_GATE,
+    },
+    body: JSON.stringify({ passage }),
   });
 }
 
